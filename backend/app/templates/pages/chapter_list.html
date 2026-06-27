@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ novel.title }} - 章节目录{% endblock %}
+{% block description %}{{ novel.title }}全部章节目录，共{{ total }}章，{{ novel.author }}作品{% endblock %}
+{% block keywords %}{{ novel.title }},章节目录,{{ novel.author }},在线阅读{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Book","name":"{{ novel.title }}","author":{"@type":"Person","name":"{{ novel.author }}"},"numberOfPages":{{ total }}}</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb"><div class="content"><a href="/">首页</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; <strong>目录（{{ total }}章）</strong></div></nav>
+{% endblock %}
+
+{% block content %}
+<div class="box">
+  <div class="catalog-header">
+    <h1 class="page-title">{{ novel.title }}</h1>
+    <p class="catalog-info">{{ novel.author }} · 共 <strong>{{ total }}</strong> 章</p>
+  </div>
+
+  {% if grouped %}
+  <div class="catalog-body">
+    {% for vol in grouped %}
+    <div class="catalog-volume">
+      <h2 class="volume-title">{{ vol.title }} <span class="volume-count">{{ vol.chapters|length }}章</span></h2>
+      <div class="volume-chapters">
+        {% for ch in vol.chapters %}
+        <a href="/chapter/{{ ch.id }}" class="chapter-link" title="{{ ch.title }}">
+          <span class="ch-title">{{ ch.title }}</span>
+          <span class="ch-meta">{{ ch.word_count }}字</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  {# Fallback: simple grid for novels without volume structure #}
+  <div class="chapter-grid">
+    {% for ch in all_chapters %}
+    <a href="/chapter/{{ ch.id }}" title="{{ ch.title }}">{{ ch.title }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

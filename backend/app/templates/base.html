@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>{% block title %}首页{% endblock %} - 铅笔小说</title>
+<meta name="description" content="{% block description %}免费在线小说阅读，海量精品网络小说资源{% endblock %}">
+<meta name="keywords" content="{% block keywords %}小说,网络小说,免费小说,在线阅读{% endblock %}">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="{{ request.url }}">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}">
+<meta property="og:title" content="{{ self.title() }}">
+<meta property="og:description" content="{{ self.description() }}">
+<meta property="og:url" content="{{ request.url }}">
+{% block og_extra %}{% endblock %}
+{% block structured_data %}{% endblock %}
+<link rel="stylesheet" href="/static/site.css">
+</head>
+<body>
+<header id="header" class="wrapper">
+  <div class="header-content">
+    <div class="header-logo"><a href="/" class="logo">📚 铅笔小说</a></div>
+    <nav class="nav">
+      <ul class="nav-menu-items">
+        <li class="nav-menu-item{% if request.url.path=='/' %} selected{% endif %}"><a href="/">首页</a></li>
+        {% for cat in (categories or [])[:12] %}
+        <li class="nav-menu-item"><a href="/novels?category={{ cat.id }}">{{ cat.name }}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+    <div class="header-module">
+      <form action="/search" method="get" class="nav-search">
+        <div class="search-box">
+          <input class="search-input" type="search" name="q" placeholder="搜索小说、作者" value="{{ query or '' }}" autocomplete="off">
+          <button class="search-btn" type="submit">搜索</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+{% block breadcrumb %}{% endblock %}
+<main id="main" class="wrapper">
+  <div class="content">
+    {% block content %}{% endblock %}
+  </div>
+</main>
+<footer id="footer" class="wrapper">
+  <div class="content"><p>&copy; 2026 铅笔小说 · 本站内容来源于网络采集</p></div>
+</footer>
+</body>
+</html>

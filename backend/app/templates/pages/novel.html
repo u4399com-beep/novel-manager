@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ novel.title }}{% endblock %}
+{% block description %}{{ novel.description[:160] if novel.description else novel.title + ' - 免费在线阅读' }}{% endblock %}
+{% block keywords %}{{ novel.title }},{{ novel.author }},小说,在线阅读{% for c in novel.categories %},{{ c.name }}{% endfor %}{% endblock %}
+{% block og_type %}book{% endblock %}
+{% block og_extra %}<meta property="og:image" content="{{ novel.cover_image_url or '' }}">{% endblock %}
+{% block structured_data %}<script type="application/ld+json">{"@context":"https://schema.org","@type":"Book","name":"{{ novel.title }}","author":{"@type":"Person","name":"{{ novel.author }}"},"description":"{{ (novel.description or '')[:500] }}","image":"{{ novel.cover_image_url or '' }}","url":"{{ request.url }}","inLanguage":"zh-CN","numberOfPages":{{ novel.total_chapters }}}</script>{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb"><div class="content"><a href="/">首页</a> &gt; <strong>{{ novel.title }}</strong></div></div>
+{% endblock %}
+
+{% block content %}
+<div class="box view-heading novel-detail-box">
+  <div class="novel-cover">
+    <div class="module-item-cover">
+      <div class="module-item-pic">
+        {% if novel.cover_image_url %}
+        <img src="{{ novel.cover_image_url }}" alt="{{ novel.title }}">
+        {% else %}
+        <span class="cover-noimg">📖</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="novel-info">
+    <div class="novel-info-header">
+      <h1 class="page-title">{{ novel.title }}</h1>
+      <div class="novel-info-aux">
+        <a class="tag-link">作者：{{ novel.author }}</a>
+        {% for cat in novel.categories %}<a href="/novels?category={{ cat.id }}" class="tag-link">{{ cat.name }}</a>{% endfor %}
+        <span class="tag-link">{{ novel.total_chapters }} 章</span>
+        <span class="tag-link">{{ '已完结' if novel.status == 'completed' else '连载中' }}</span>
+      </div>
+    </div>
+    <div class="novel-info-main">
+      <div class="novel-info-content">
+        <p>{% if novel.description %}{{ novel.description }}{% else %}暂无简介{% endif %}</p>
+      </div>
+    </div>
+    <div class="novel-info-footer">
+      <a href="/novel/{{ novel.id }}/chapters" class="btn-large btn-read">开始阅读</a>
+    </div>
+  </div>
+</div>
+
+<div class="box">
+  <div class="module newchapter">
+    <div class="module-heading"><h2 class="module-title">最新章节</h2></div>
+    <div class="module-list">
+      {% for ch in (chapters or [])[:15] %}
+      <div class="module-row-info">
+        <a class="module-row-text" href="/chapter/{{ ch.id }}" title="{{ ch.title }}">
+          <div class="module-row-title"><span>{{ ch.title }}</span></div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    {% if novel.total_chapters > 15 %}
+    <div style="text-align:center;margin-top:16px">
+      <a href="/novel/{{ novel.id }}/chapters" class="btn-large btn-more">查看全部 {{ novel.total_chapters }} 章</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

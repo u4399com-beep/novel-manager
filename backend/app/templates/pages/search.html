@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}搜索: {{ query }}{% endblock %}
+{% block description %}搜索小说：{{ query }}，共找到 {{ total }} 个结果{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb"><div class="container">
+  <a href="/">首页</a> <span>/</span> <strong>搜索</strong>
+</div></nav>
+{% endblock %}
+
+{% block content %}
+<div class="search-page">
+  <h2>{% if query %}搜索 "{{ query }}" — {{ total }} 个结果{% else %}搜索小说{% endif %}</h2>
+  {% if results %}
+  <div class="search-results">
+    {% for novel in results %}
+    <article class="search-item">
+      <h3><a href="/novel/{{ novel.id }}">{{ novel.title }}</a></h3>
+      <p class="meta">{{ novel.author }} ·
+        {% if novel.status == 'completed' %}已完结{% else %}连载中{% endif %} ·
+        {{ novel.total_chapters }} 章</p>
+      {% if novel.description %}<p style="font-size:.9rem;color:#6c757d;margin-top:4px">{{ novel.description[:200] }}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% elif query %}
+  <p style="color:#6c757d">未找到与 "{{ query }}" 相关的小说</p>
+  {% endif %}
+</div>
+{% endblock %}

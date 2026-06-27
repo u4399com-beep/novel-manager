@@ -1,0 +1,123 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  height: 100vh;
+}
+
+/* Layout overrides */
+.app-layout {
+  height: 100vh;
+}
+
+.app-layout .el-aside {
+  background-color: #304156;
+}
+
+.app-layout .el-header {
+  background: #fff;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+}
+
+.app-layout .el-main {
+  background: #f5f7fa;
+  padding: 20px;
+}
+
+/* Sidebar logo */
+.sidebar-logo {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 18px;
+  font-weight: bold;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Page header */
+.page-header {
+  margin-bottom: 20px;
+}
+
+.page-header h2 {
+  margin: 0 0 5px 0;
+  font-size: 20px;
+}
+
+.page-header p {
+  margin: 0;
+  color: #909399;
+  font-size: 14px;
+}
+
+/* Card-style containers */
+.content-card {
+  background: #fff;
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Search bar row */
+.toolbar-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.toolbar-row .el-input {
+  width: 240px;
+}
+
+/* Dashboard stats cards */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stat-card .stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: #fff;
+}
+
+.stat-card .stat-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.stat-card .stat-label {
+  font-size: 14px;
+  color: #909399;
+}

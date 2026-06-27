@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}首页{% endblock %}
+{% block body_class %}homepage{% endblock %}
+{% block description %}免费在线小说阅读，海量精品小说资源，每日更新，铅笔小说{% endblock %}
+{% block keywords %}小说,网络小说,免费小说,在线阅读,铅笔小说,小说推荐{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"铅笔小说","url":"{{ request.url }}","description":"免费在线小说阅读平台","potentialAction":{"@type":"SearchAction","target":"{{ request.url }}search?q={search_term_string}","query-input":"required name=search_term_string"}}</script>
+{% endblock %}
+
+{% block content %}
+<div class="list">
+  <div class="box">
+    <div class="module">
+      <div class="module-heading"><h2 class="module-title">最新入库</h2></div>
+      <div class="module-list module-lines-list">
+        <div class="module-items">
+          {% for novel in novels %}
+          <div class="module-item">
+            <div class="module-item-cover">
+              <div class="module-item-top">{{ loop.index + (page-1)*24 }}</div>
+              <div class="module-item-pic">
+                <a href="/novel/{{ novel.id }}" title="{{ novel.title }}">
+                  {% if novel.cover_image_url %}
+                  <img src="{{ novel.cover_image_url }}" alt="{{ novel.title }}" loading="lazy">
+                  {% else %}
+                  <span class="cover-noimg">📖</span>
+                  {% endif %}
+                </a>
+              </div>
+              <div class="module-item-caption">
+                {% if novel.categories %}{% for cat in novel.categories[:3] %}<span>{{ cat.name }}</span>{% if not loop.last %}  {% endif %}{% endfor %}{% endif %}
+              </div>
+            </div>
+            <div class="module-item-titlebox">
+              <a href="/novel/{{ novel.id }}" class="module-item-title" title="{{ novel.title }}">{{ novel.title }}</a>
+            </div>
+            <div class="module-item-text">{{ novel.author or '佚名' }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if pages > 1 %}
+<div class="pagination">
+  {% if page > 1 %}<a href="?page={{ page-1 }}">← 上一页</a>{% endif %}
+  {% for p in range(1, pages+1) %}
+  {% if p == page %}<span class="current">{{ p }}</span>
+  {% elif p <= 2 or p > pages-2 or (p >= page-2 and p <= page+2) %}
+  <a href="?page={{ p }}">{{ p }}</a>
+  {% elif p == 3 or p == pages-3 %}<span>…</span>{% endif %}
+  {% endfor %}
+  {% if page < pages %}<a href="?page={{ page+1 }}">下一页 →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

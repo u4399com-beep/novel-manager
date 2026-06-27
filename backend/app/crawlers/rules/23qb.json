@@ -1,0 +1,209 @@
+{
+  "source_name": "23qb",
+  "base_url": "https://www.23qb.net",
+  "description": "铅笔小说 - 免费网络小说阅读网",
+  "version": "1.0",
+  "selectors": {
+    "search": {
+      "url": "/search.html?searchkey={keyword}",
+      "container": ".module-search-item",
+      "fields": {
+        "title": {
+          "selector": "a[title]",
+          "attribute": "title",
+          "fallback_selector": "h3 a",
+          "fallback_attribute": "text",
+          "description": "小说标题（封面链接的title属性）"
+        },
+        "author": {
+          "selector": ".tag-link span",
+          "attribute": "text",
+          "transform": "strip_prefix:.",
+          "fallback_selector": ".novel-info-aux",
+          "fallback_attribute": "text",
+          "fallback_transform": "strip_prefix:.",
+          "description": "作者（从标签文本提取）"
+        },
+        "url": {
+          "selector": "a[title]",
+          "attribute": "href",
+          "transform": "absolute_url",
+          "fallback_selector": "h3 a",
+          "fallback_attribute": "href",
+          "fallback_transform": "absolute_url",
+          "description": "小说详情页链接"
+        },
+        "book_id": {
+          "selector": "a[title]",
+          "attribute": "href",
+          "transform": "regex",
+          "transform_pattern": "/book/(\\d+)",
+          "fallback_selector": "h3 a",
+          "fallback_attribute": "href",
+          "fallback_transform": "regex",
+          "description": "书籍ID（从URL提取）"
+        },
+        "description": {
+          "selector": ".novel-info-item",
+          "attribute": "text",
+          "fallback_selector": ".novel-info-main",
+          "fallback_attribute": "text",
+          "description": "小说简介"
+        },
+        "cover_url": {
+          "selector": "img",
+          "attribute": "data-src",
+          "transform": "absolute_url",
+          "description": "封面图片URL"
+        }
+      }
+    },
+    "novel_info": {
+      "url": "{novel_url}",
+      "container": "body",
+      "fields": {
+        "title": {
+          "selector": "meta[property='og:novel:book_name']",
+          "attribute": "content",
+          "fallback_selector": "h1.page-title",
+          "fallback_attribute": "text",
+          "description": "小说标题"
+        },
+        "author": {
+          "selector": "meta[property='og:novel:author']",
+          "attribute": "content",
+          "fallback_selector": ".novel-info-aux a[title]",
+          "fallback_attribute": "text",
+          "fallback_transform": "strip_prefix:作者：",
+          "description": "作者"
+        },
+        "description": {
+          "selector": "meta[property='og:description']",
+          "attribute": "content",
+          "fallback_selector": ".novel-info-content span",
+          "fallback_attribute": "text",
+          "description": "小说简介"
+        },
+        "cover_url": {
+          "selector": "meta[property='og:image']",
+          "attribute": "content",
+          "transform": "absolute_url",
+          "description": "封面图片URL"
+        },
+        "status": {
+          "selector": "meta[property='og:novel:status']",
+          "attribute": "content",
+          "fallback": "ongoing",
+          "transform": "status_map",
+          "status_map": {"完结": "completed", "连载": "ongoing", "连载中": "ongoing"},
+          "description": "状态（完结/连载）"
+        },
+        "category_name": {
+          "selector": ".novel-info-aux a[href*='/book/lastupdate']",
+          "attribute": "text",
+          "description": "分类名称"
+        },
+        "tags": {
+          "selector": "meta[property='og:novel:tags']",
+          "attribute": "content",
+          "description": "标签"
+        },
+        "book_id": {
+          "selector": "meta[property='og:url']",
+          "attribute": "content",
+          "transform": "regex",
+          "transform_pattern": "/book/(\\d+)",
+          "fallback": "from_url",
+          "description": "书籍ID"
+        },
+        "word_count_text": {
+          "selector": ".tag-link",
+          "attribute": "text",
+          "fallback": "",
+          "description": "字数文本(如812.1万字)"
+        }
+      }
+    },
+    "catalog": {
+      "url": "{base_url}/book/{book_id}/catalog",
+      "container": ".module-row-info",
+      "fields": {
+        "title": {
+          "selector": "a.module-row-text",
+          "attribute": "title",
+          "fallback_selector": ".module-row-title span",
+          "fallback_attribute": "text",
+          "description": "章节标题"
+        },
+        "url": {
+          "selector": "a.module-row-text",
+          "attribute": "href",
+          "transform": "absolute_url",
+          "description": "章节链接"
+        }
+      }
+    },
+    "chapter": {
+      "url": "{chapter_url}",
+      "container": "body",
+      "fields": {
+        "title": {
+          "selector": "h1.article-title",
+          "attribute": "text",
+          "description": "章节标题"
+        },
+        "content": {
+          "selector": ".view-heading .article-content",
+          "attribute": "text",
+          "cleanup": ["script", "ins", ".adsbygoogle"],
+          "description": "章节正文"
+        }
+      }
+    }
+  },
+  "options": {
+    "request_delay": 1.0,
+    "timeout": 60,
+    "encoding": "utf-8",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+    }
+  },
+  "category_map": {
+    "1": {"slug": "yanqing", "name": "言情"},
+    "2": {"slug": "dushi", "name": "都市"},
+    "3": {"slug": "weimei", "name": "唯美"},
+    "4": {"slug": "chuanyue", "name": "穿越"},
+    "5": {"slug": "qingchun", "name": "青春"},
+    "6": {"slug": "xuanhuan", "name": "玄幻"},
+    "7": {"slug": "wuxia", "name": "武侠"},
+    "8": {"slug": "junshi", "name": "军事"},
+    "9": {"slug": "jingji", "name": "竞技"},
+    "10": {"slug": "kehuan", "name": "科幻"},
+    "11": {"slug": "xuanyi", "name": "悬疑"},
+    "12": {"slug": "tongren", "name": "同人"},
+    "13": {"slug": "zhichang", "name": "职场"}
+  },
+  "status_map": {
+    "完结": "completed",
+    "连载": "ongoing",
+    "连载中": "ongoing"
+  },
+  "cleaner": {
+    "enabled": true,
+    "remove_lines": [
+      "^.*(加入书签|推荐本书|投推荐票|手机阅读|下载APP).*$",
+      "^.*(Ctrl\\\\s*\\\\+?\\\\s*[DF]|F5|F11).*$",
+      "^.*(记住本站|收藏本站|网址|域名).*$",
+      "^[\\s.。…]{10,}$"
+    ],
+    "inline_remove": [
+      "（本章未完[^）]*）",
+      "【[^】]*?(更新|首发|独家)[^】]*?】"
+    ],
+    "min_line_length": 2,
+    "max_repeat_ratio": 0.6
+  }
+}

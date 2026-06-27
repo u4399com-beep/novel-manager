@@ -1,0 +1,134 @@
+/* ============================================================
+   Novel Manager - Public Site CSS
+   SEO-friendly, mobile-first, semantic HTML
+   ============================================================ */
+
+:root {
+  --c-bg: #f8f9fa;
+  --c-white: #fff;
+  --c-text: #212529;
+  --c-muted: #6c757d;
+  --c-border: #dee2e6;
+  --c-primary: #4361ee;
+  --c-primary-dark: #3a56d4;
+  --c-success: #2d9b4e;
+  --c-warning: #e6a817;
+  --c-card: #fff;
+  --r: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06);
+  --max-w: 1100px;
+}
+
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0 }
+html { font-size:16px; scroll-behavior:smooth }
+body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif; color:var(--c-text); background:var(--c-bg); line-height:1.7 }
+a { color:var(--c-primary); text-decoration:none }
+a:hover { text-decoration:underline }
+img { max-width:100%; height:auto }
+.container { max-width:var(--max-w); margin:0 auto; padding:0 16px }
+
+/* Header */
+.site-header { background:var(--c-white); border-bottom:1px solid var(--c-border); position:sticky; top:0; z-index:100 }
+.site-header .container { display:flex; align-items:center; height:56px; gap:20px }
+.logo { font-size:1.2rem; font-weight:700; color:var(--c-text); white-space:nowrap }
+.logo:hover { text-decoration:none }
+.site-nav { display:flex; gap:16px; font-size:.9rem }
+.site-nav a { color:var(--c-muted); padding:4px 0 }
+.site-nav a:hover { color:var(--c-primary); text-decoration:none }
+.header-search { display:flex; margin-left:auto; gap:0 }
+.header-search input { border:1px solid var(--c-border); border-radius:var(--r) 0 0 var(--r); padding:6px 12px; width:180px; font-size:.85rem; outline:none }
+.header-search input:focus { border-color:var(--c-primary) }
+.header-search button { border:1px solid var(--c-primary); background:var(--c-primary); color:#fff; border-radius:0 var(--r) var(--r) 0; padding:6px 14px; cursor:pointer; font-size:.85rem }
+
+/* Breadcrumb */
+.breadcrumb { background:var(--c-white); border-bottom:1px solid var(--c-border); padding:10px 0; font-size:.85rem }
+.breadcrumb a { color:var(--c-muted) }
+.breadcrumb span { color:var(--c-border); margin:0 4px }
+.breadcrumb strong { color:var(--c-text); font-weight:500 }
+
+/* Main */
+.site-main { padding:24px 0; min-height:60vh }
+
+/* Home */
+.home-layout { display:grid; grid-template-columns:180px 1fr; gap:24px }
+.home-sidebar h2 { font-size:1rem; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid var(--c-primary) }
+.category-list { list-style:none }
+.category-list li { margin-bottom:4px }
+.category-list a { display:block; padding:4px 8px; border-radius:4px; font-size:.9rem; color:var(--c-text) }
+.category-list a:hover { background:#eef0ff; color:var(--c-primary); text-decoration:none }
+.home-content h2 { font-size:1.1rem; margin-bottom:16px }
+
+/* Novel Grid */
+.novel-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:16px }
+.novel-card { background:var(--c-card); border-radius:var(--r); box-shadow:var(--shadow); overflow:hidden; transition:box-shadow .2s }
+.novel-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.1) }
+.novel-card a img { display:block; width:100%; height:200px; object-fit:cover; background:#f0f0f0 }
+.cover-placeholder { width:100%; height:200px; display:flex; align-items:center; justify-content:center; background:#f0f0f0; font-size:3rem; color:#ccc }
+.cover-placeholder.large { width:180px; height:240px; font-size:5rem }
+.novel-card-info { padding:10px 12px }
+.novel-card-info h3 { font-size:.9rem; margin-bottom:4px; line-height:1.4 }
+.novel-card-info h3 a { color:var(--c-text) }
+.novel-card-info .author { font-size:.8rem; color:var(--c-muted); margin-bottom:4px }
+.novel-card-info .meta { font-size:.75rem; display:flex; gap:6px; align-items:center }
+.tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:.7rem; font-weight:600 }
+.tag.completed { background:#d4edda; color:var(--c-success) }
+.tag.ongoing { background:#fff3cd; color:var(--c-warning) }
+
+/* Pagination */
+.pagination { display:flex; gap:4px; justify-content:center; margin-top:32px; flex-wrap:wrap }
+.pagination a, .pagination span { display:inline-block; padding:6px 14px; border:1px solid var(--c-border); border-radius:4px; font-size:.9rem }
+.pagination a:hover { background:var(--c-primary); color:#fff; text-decoration:none; border-color:var(--c-primary) }
+.pagination .current { background:var(--c-primary); color:#fff; border-color:var(--c-primary) }
+
+/* Novel Detail */
+.novel-header { display:flex; gap:24px; background:var(--c-card); padding:24px; border-radius:var(--r); box-shadow:var(--shadow); flex-wrap:wrap }
+.novel-cover img { border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,.1) }
+.novel-meta { flex:1; min-width:280px }
+.novel-meta h1 { font-size:1.5rem; margin-bottom:12px }
+.novel-meta p { margin-bottom:8px; font-size:.95rem }
+.novel-meta .description { margin-top:16px; padding-top:16px; border-top:1px solid var(--c-border) }
+.novel-meta .description h3 { font-size:.95rem; margin-bottom:8px }
+.novel-meta .description p { font-size:.9rem; color:var(--c-muted); line-height:1.8 }
+.btn-primary { display:inline-block; background:var(--c-primary); color:#fff; padding:10px 32px; border-radius:var(--r); font-weight:600; margin-top:12px }
+.btn-primary:hover { background:var(--c-primary-dark); text-decoration:none }
+
+/* Chapter Reader */
+.chapter-reader { max-width:780px; margin:0 auto }
+.chapter-header { text-align:center; padding:24px 0 16px }
+.chapter-header h1 { font-size:1.4rem }
+.chapter-info { font-size:.85rem; color:var(--c-muted); margin-top:8px }
+.chapter-nav { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--c-border); font-size:.9rem }
+.chapter-nav.bottom { border-bottom:none; border-top:1px solid var(--c-border); margin-top:24px }
+.chapter-nav a { color:var(--c-primary) }
+.chapter-content { padding:24px 0; font-size:1.05rem; line-height:2 }
+.chapter-content p { text-indent:2em; margin-bottom:1em }
+.chapter-content .empty { text-align:center; color:var(--c-muted); padding:60px 0 }
+
+/* Search */
+.search-page h2 { margin-bottom:20px }
+.search-results { display:flex; flex-direction:column; gap:12px }
+.search-item { background:var(--c-card); padding:16px; border-radius:var(--r); box-shadow:var(--shadow) }
+.search-item h3 { font-size:1rem; margin-bottom:4px }
+.search-item .meta { font-size:.85rem; color:var(--c-muted) }
+
+/* Chapter List */
+.chapter-list { background:var(--c-card); padding:24px; border-radius:var(--r); box-shadow:var(--shadow) }
+.chapter-list h2 { margin-bottom:16px }
+.chapter-list .chapters { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:4px }
+.chapter-list .chapters a { display:block; padding:6px 12px; border-radius:4px; font-size:.9rem }
+.chapter-list .chapters a:hover { background:#eef0ff }
+
+/* Footer */
+.site-footer { background:var(--c-white); border-top:1px solid var(--c-border); padding:20px 0; text-align:center; font-size:.85rem; color:var(--c-muted); margin-top:40px }
+
+/* Responsive */
+@media (max-width:768px) {
+  .home-layout { grid-template-columns:1fr }
+  .home-sidebar { display:none }
+  .site-nav { display:none }
+  .header-search input { width:120px }
+  .novel-grid { grid-template-columns:repeat(auto-fill,minmax(140px,1fr)) }
+  .novel-header { flex-direction:column; align-items:center }
+  .novel-cover img { width:140px; height:auto }
+  .novel-meta h1 { font-size:1.3rem; text-align:center }
+}

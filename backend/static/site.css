@@ -1,0 +1,135 @@
+/* 23qb.net exact style clone */
+
+html,body{height:100%}
+body{font-family:-apple-system-font,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Hiragino Sans GB","Microsoft YaHei UI","Microsoft YaHei",Arial,sans-serif;color:#282828;background:#f8f9f9;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:#282828;text-decoration:none;transition:color .2s}a:hover{color:#ff2a14}
+img{max-width:100%;height:auto}.wrapper{width:100%}
+.content{width:100%;max-width:1740px;margin:0 auto;padding:0}
+
+/* Header — exact 23qb */
+#header{background:#fff;position:sticky;top:0;z-index:200;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.header-content{display:flex;align-items:center;height:70px;gap:16px;padding:0 25px;max-width:1740px;margin:0 auto}
+.header-logo .logo{font-size:1.3rem;font-weight:700;color:#282828;white-space:nowrap}
+.nav-menu-items{list-style:none;display:flex;align-items:center;gap:0}
+.nav-menu-item a{display:block;padding:8px 12px;font-size:.9rem;font-weight:500;color:#282828;border-radius:3px;white-space:nowrap}
+.nav-menu-item a:hover,.nav-menu-item.selected a{color:#ff2a14;background:rgba(255,42,20,.04)}
+.header-module{margin-left:auto}
+.nav-search{max-width:400px;width:100%;margin-left:auto}
+.search-box{display:flex;align-items:center}
+.search-input{flex:1;border:1px solid #e3e6eb;border-radius:20px;padding:0 10px 0 20px;height:36px;font-size:16px;outline:none;background:#f8f9f9;width:100%}
+.search-input:focus{border-color:#10AEFF;background:#fff}
+.search-btn{background:#10AEFF;color:#fff;border:none;border-radius:20px;padding:0 16px;height:36px;margin-left:6px;cursor:pointer;font-size:16px;white-space:nowrap}
+
+/* Breadcrumb */
+.breadcrumb{padding:8px 25px;font-size:14px;color:#999;background:#fff;border-bottom:1px solid #e3e6eb}
+.breadcrumb a{color:#999}.breadcrumb a:hover{color:#ff2a14}
+
+/* Main */
+#main{padding:25px}
+#main>.content{max-width:1740px;margin:0 auto}
+
+/* Box */
+.box{padding:25px;background:#fff;border-radius:18px;margin:10px 0 30px;position:relative}
+
+/* Module */
+.module-title{font-size:20px;font-weight:600;display:inline-block;position:relative;padding-bottom:8px;margin-bottom:16px}
+.module-title::after{content:'';position:absolute;bottom:0;left:0;width:100%;height:3px;background:#ff2a14;border-radius:2px}
+.module-list{margin-top:10px}
+
+/* Novel Cards — exact 23qb sizes */
+.module-items{display:flex;flex-wrap:wrap}
+.module-item{position:relative;width:200px;margin:0 20px 20px 0;display:inline-block;font-size:14px;vertical-align:top}
+.module-item-cover{position:relative;height:0;padding-top:140%;background-position:50% 50%;background-size:cover;overflow:hidden;border-radius:8px;transition:box-shadow .3s}
+.module-item-cover:hover{box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.module-item-pic{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:8px}
+.module-item-pic a{display:block;width:100%;height:100%}
+.module-item-pic img{width:100%;height:100%;object-fit:cover;border-radius:8px}
+.module-item-pic .cover-noimg{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:4rem;background:linear-gradient(135deg,#f0f1f2,#e3e6eb);color:#c0c4cc}
+.module-item-top{position:absolute;left:0;top:0;width:38px;height:38px;font-size:30px;font-weight:700;color:#fff;text-align:center;line-height:38px;background:linear-gradient(135deg,#ff2a14,#ff6b5b);border-radius:8px 0 8px 0;z-index:1}
+.module-item-caption{position:absolute;bottom:0;left:0;right:0;padding:30px 8px 6px;font-size:12px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.7));text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.module-item-titlebox{margin-top:12px;text-align:center}
+.module-item-title{font-weight:700;font-size:.92rem;color:#282828;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4}
+.module-item-title:hover{color:#ff2a14}
+.module-item-text{margin-top:3px;color:rgba(0,0,0,.4);text-align:center;font-size:12px}
+
+/* Pagination */
+.pagination{display:flex;gap:6px;justify-content:center;margin:30px 0;flex-wrap:wrap}
+.pagination a,.pagination span{min-width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-size:.88rem;border:1px solid #e3e6eb}
+.pagination a:hover{background:#ff2a14;color:#fff;border-color:#ff2a14}
+.pagination .current{background:#ff2a14;color:#fff;border-color:#ff2a14;font-weight:600}
+
+/* Novel Detail */
+.novel-detail-box{display:flex;gap:25px;flex-wrap:wrap}
+.novel-cover{flex-shrink:0;width:200px;overflow:hidden;border-radius:10px;margin:0 0 0 25px;float:right}
+.novel-info{flex:1;min-width:280px}
+.page-title{font-size:38px;font-weight:700;margin-bottom:10px;line-height:1.2}
+.novel-info-aux{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.88rem;margin-bottom:14px}
+.tag-link{padding:2px 10px;background:#f8f9f9;border-radius:4px;font-size:.82rem;color:#282828}
+.tag-link:hover{color:#ff2a14}
+.novel-info-content{font-size:.92rem;color:rgba(0,0,0,.4);line-height:1.9}
+.novel-info-footer{margin-top:16px}
+.btn-large{display:inline-block;padding:10px 28px;border-radius:24px;font-weight:600;font-size:.9rem;transition:all .15s}
+.btn-read{background:#ff2a14;color:#fff}.btn-read:hover{background:#e01000;color:#fff}
+.btn-more{background:#f8f9f9;color:#282828;border:1px solid #e3e6eb}.btn-more:hover{color:#ff2a14;border-color:#ff2a14}
+
+/* Chapter Rows */
+.module-row-info{border-bottom:1px solid #f8f9f9}
+.module-row-text{display:flex;align-items:center;padding:10px 12px;gap:8px;font-size:.9rem;transition:background .15s;color:#282828}
+.module-row-text:hover{background:#f8f9f9;color:#ff2a14}
+.module-row-title span{color:#282828}.module-row-text:hover .module-row-title span{color:#ff2a14}
+.newchapter .module-title::after{background:#7ec53d}
+
+/* Chapter Reading */
+.view-heading{margin-top:0;background:#fff;padding:20px 0}
+.chepnav{font-size:14px;color:#999;margin-bottom:14px}
+.chepnav a{color:#999}.chepnav a:hover{color:#ff2a14}
+.article-title{font-size:1.4rem;font-weight:700;text-align:center;margin-bottom:6px}
+.article-info{text-align:center;font-size:14px;color:#999;margin-bottom:20px}
+.article-content{z-index:2;position:relative;word-break:break-word;padding-top:1.25rem;font-size:1.05rem;line-height:2.1}
+.article-content p{text-indent:2em;margin-bottom:1.1em}
+.article-content .empty{text-align:center;color:#999;padding:60px 0}
+.chapter-pager{display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding-top:14px;border-top:1px solid #e3e6eb}
+.chapter-pager a{color:#10AEFF;font-size:.9rem;padding:6px 16px;border-radius:18px}
+.chapter-pager a:hover{background:#f0f6ff}.chapter-pager .disabled{color:#e3e6eb;font-size:.9rem;padding:6px 16px}
+
+/* Catalog */
+.catalog-header{text-align:center;padding:8px 0 20px;border-bottom:1px solid #e3e6eb;margin-bottom:20px}
+.catalog-header .page-title{font-size:1.5rem;margin-bottom:6px}
+.catalog-info{font-size:.88rem;color:#999}
+.catalog-volume{margin-bottom:20px}
+.volume-title{font-size:1.1rem;font-weight:700;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #ff2a14;display:flex;align-items:baseline;gap:8px}
+.volume-count{font-size:.78rem;font-weight:400;color:#999}
+.volume-chapters{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:2px}
+.chapter-link{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-radius:4px;font-size:.88rem;transition:background .12s;gap:8px}
+.chapter-link:hover{background:#fff5f5;color:#ff2a14}
+.chapter-link .ch-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chapter-link .ch-meta{font-size:.75rem;color:#999;flex-shrink:0}
+.chapter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px}
+.chapter-grid a{display:block;padding:8px 14px;border-radius:4px;font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chapter-grid a:hover{background:#fff5f5;color:#ff2a14}
+
+/* Search */
+.search-item{padding:16px 20px;background:#fff;border-radius:8px;margin-bottom:8px;border:1px solid #e3e6eb}
+.search-item h3{font-size:1rem;margin-bottom:4px}.search-item h3 a:hover{color:#ff2a14}
+.search-item .meta{font-size:.82rem;color:#999}
+
+/* Footer */
+#footer{padding:20px 25px;text-align:center;font-size:14px;color:#999;border-top:1px solid #e3e6eb;margin-top:30px}
+
+/* Responsive */
+@media(max-width:768px){
+  .content{padding:0 10px}#main{padding:10px}
+  .header-content{height:50px;gap:8px;padding:0 10px}
+  .nav-menu-items{display:none}
+  .search-input{width:120px;font-size:14px}
+  .module-item{width:calc(33.33% - 8px);margin:0 6px 12px 0}
+  .novel-detail-box{flex-direction:column;align-items:center}
+  .novel-cover{width:150px;margin:0;float:none}
+  .page-title{font-size:28px;text-align:center}
+  .volume-chapters{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+}
+@media(max-width:480px){
+  .module-item{width:calc(50% - 4px);margin:0 3px 8px 0}
+  .module-item-top{width:28px;height:28px;font-size:20px;line-height:28px}
+  .article-content{font-size:1rem}.page-title{font-size:22px}
+}
