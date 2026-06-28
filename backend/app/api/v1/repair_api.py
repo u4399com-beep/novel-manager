@@ -26,26 +26,23 @@ async def repair_status(current_user: User = Depends(get_current_user)):
     from sqlalchemy import select, func, and_
 
     async with async_session_factory() as db:
-        # Empty chapters
-        empty_ch = (await db.execute(
+        empty_ch = int((await db.execute(
             select(func.count()).where(and_(Chapter.content == None, Chapter.content_file == None))
-        )).scalar() or 0
+        )).scalar() or 0)
 
-        # No cover
-        no_cover = (await db.execute(
+        no_cover = int((await db.execute(
             select(func.count()).where((Novel.cover_image_url == None) | (Novel.cover_image_url == ''))
-        )).scalar() or 0
+        )).scalar() or 0)
 
-        # No description or author
-        no_desc = (await db.execute(
+        no_desc = int((await db.execute(
             select(func.count()).where((Novel.description == None) | (Novel.description == ''))
-        )).scalar() or 0
+        )).scalar() or 0)
 
-        no_author = (await db.execute(
+        no_author = int((await db.execute(
             select(func.count()).where((Novel.author == None) | (Novel.author == ''))
-        )).scalar() or 0
+        )).scalar() or 0)
 
-        total = (await db.execute(select(func.count()).select_from(Novel))).scalar() or 1
+        total = int((await db.execute(select(func.count()).select_from(Novel))).scalar() or 1)
 
     return {
         "empty_chapters": empty_ch,
@@ -158,16 +155,21 @@ async def start_repair_info(batch_size: int = 100, current_user: User = Depends(
             log_inner.info(f"Fixed {fixed}/{len(novels)} novel info")
 
     asyncio.create_task(repair())
-    _repair_tasks["info"] = True  # mark as running
+    # Use a dummy completed process to mark as running
+    _repair_tasks["info"] = subprocess.Popen(["echo", "running"])
     return {"message": f"Novel info repair started ({batch_size} books)", "success": True}
 
 
 @router.post("/info/stop")
 async def stop_repair_info(current_user: User = Depends(get_current_user)):
     """Stop info repair."""
-    if "info" in _repair_tasks:
+    p = _repair_tasks.get("info")
+    if p and p.poll() is None:
+        p.terminate()
         del _repair_tasks["info"]
         return {"message": "Stopped", "success": True}
+    if "info" in _repair_tasks:
+        del _repair_tasks["info"]
     return {"message": "Not running", "success": False}
 
 

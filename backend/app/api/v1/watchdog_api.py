@@ -22,20 +22,18 @@ async def watchdog_status(current_user: User = Depends(get_current_user)):
         # Queue stats
         stats = {}
         for st in ("pending", "running", "completed", "failed"):
-            stats[st] = (await db.execute(
+            stats[st] = int((await db.execute(
                 select(func.count()).where(CrawlerTask.status == st)
-            )).scalar() or 0
+            )).scalar() or 0)
 
-        # Stuck tasks
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=600)
-        stuck = (await db.execute(
+        stuck = int((await db.execute(
             select(func.count()).where(CrawlerTask.status == "running", CrawlerTask.started_at < cutoff)
-        )).scalar() or 0
+        )).scalar() or 0)
 
-        # Empty chapters
-        empty = (await db.execute(
+        empty = int((await db.execute(
             select(func.count()).where(and_(Chapter.content == None, Chapter.content_file == None))
-        )).scalar() or 0
+        )).scalar() or 0)
 
         # Runner alive
         try:

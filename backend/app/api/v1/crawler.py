@@ -681,13 +681,13 @@ async def system_stats(db: AsyncSession = Depends(get_db), current_user: User = 
     from sqlalchemy import text as sa_text
 
     async def _compute():
-        total_t = (await db.execute(select(func.count()).select_from(CrawlerTaskModel))).scalar() or 0
-        pending_t = (await db.execute(select(func.count()).where(CrawlerTaskModel.status=="pending"))).scalar() or 0
-        completed_t = (await db.execute(select(func.count()).where(CrawlerTaskModel.status=="completed"))).scalar() or 0
-        failed_t = (await db.execute(select(func.count()).where(CrawlerTaskModel.status=="failed"))).scalar() or 0
-        total_n = (await db.execute(select(func.count()).select_from(NovelModel))).scalar() or 0
-        total_ch = (await db.execute(sa_text("SELECT COUNT(*) FROM chapters"))).scalar() or 0
-        total_words = (await db.execute(sa_text("SELECT COALESCE(SUM(word_count),0) FROM chapters"))).scalar() or 0
+        total_t = int((await db.execute(select(func.count()).select_from(CrawlerTaskModel))).scalar() or 0)
+        pending_t = int((await db.execute(select(func.count()).where(CrawlerTaskModel.status=="pending"))).scalar() or 0)
+        completed_t = int((await db.execute(select(func.count()).where(CrawlerTaskModel.status=="completed"))).scalar() or 0)
+        failed_t = int((await db.execute(select(func.count()).where(CrawlerTaskModel.status=="failed"))).scalar() or 0)
+        total_n = int((await db.execute(select(func.count()).select_from(NovelModel))).scalar() or 0)
+        total_ch = int((await db.execute(sa_text("SELECT COUNT(*) FROM chapters"))).scalar() or 0)
+        total_words = int((await db.execute(sa_text("SELECT COALESCE(SUM(word_count),0) FROM chapters"))).scalar() or 0)
         gz = glob.glob("data/content/**/*.gz", recursive=True)
         try: r = subprocess.run(['pgrep','-f','queue_runner'], capture_output=True, text=True); qp = r.stdout.strip() if r.returncode==0 else None
         except: qp = None
@@ -703,8 +703,8 @@ async def queue_status():
     global _queue_running
     from app.database import async_session_factory as asf
     async with asf() as s:
-        pending = (await s.execute(select(func.count()).where(CrawlerTaskModel.status == "pending"))).scalar()
-    return {"running": _queue_running, "pending": pending or 0}
+        pending = int((await s.execute(select(func.count()).where(CrawlerTaskModel.status == "pending"))).scalar() or 0)
+    return {"running": _queue_running, "pending": pending}
 
 
 @router.get("/tasks/{task_id}", response_model=CrawlerTaskRead)
