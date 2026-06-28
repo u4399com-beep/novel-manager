@@ -33,6 +33,14 @@
           <el-icon><Setting /></el-icon>
           <span>采集规则</span>
         </el-menu-item>
+        <el-menu-item index="/sites">
+          <el-icon><Monitor /></el-icon>
+          <span>站群管理</span>
+        </el-menu-item>
+        <el-menu-item index="/link-rings">
+          <el-icon><Connection /></el-icon>
+          <span>链轮管理</span>
+        </el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
@@ -72,6 +80,8 @@ import {
   Expand,
   Fold,
   Setting,
+  Monitor,
+  Connection,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

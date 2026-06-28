@@ -1,0 +1,34 @@
+{# Link Wheel Breadcrumb — shared across all public pages #}
+{% if link_wheel_links and modules.link_wheel %}
+<style>
+.link-wheel-bar{margin:0 0 16px;padding:10px 16px;background:linear-gradient(135deg,#f0f4ff,#fef6f0);border-radius:8px;border:1px solid #e8ecf4;overflow:hidden}
+.link-wheel-inner{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:13px;line-height:1.6}
+.link-wheel-label{font-weight:700;color:#e67e22;white-space:nowrap;font-size:13px;margin-right:2px}
+.link-wheel-sep{color:#c0c4cc;font-size:12px;user-select:none}
+.link-wheel-item{color:#409eff;text-decoration:none;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;padding:2px 6px;border-radius:4px;transition:all .15s}
+.link-wheel-item:hover{color:#ff6b35;background:rgba(255,107,53,.06);text-decoration:underline}
+@media(max-width:768px){
+  .link-wheel-bar{padding:8px 12px;margin:0 0 12px}
+  .link-wheel-inner{font-size:12px;gap:2px 4px}
+  .link-wheel-item{max-width:120px;font-size:12px}
+  .link-wheel-label{font-size:12px}
+}
+@media(max-width:480px){
+  .link-wheel-item{max-width:90px;font-size:11px}
+}
+</style>
+<div class="link-wheel-bar">
+  <div class="link-wheel-inner">
+    <span class="link-wheel-label">🔗 {{ T('friend_links') }}</span>
+    {% for link in link_wheel_links %}
+    <span class="link-wheel-sep">›</span>
+    <a href="{{ link.url }}"
+       class="link-wheel-item"
+       {% if link.open_new_tab %}target="_blank"{% endif %}
+       {% if link.nofollow %}rel="nofollow"{% endif %}>
+      {{ link.anchor_text }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}

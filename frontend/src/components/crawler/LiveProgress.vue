@@ -134,7 +134,7 @@ function connect() {
         case 'heartbeat':
           break
       }
-    } catch { /* parse error */ }
+    } catch { /* parse error — non-JSON line */ }
   }
 
   eventSource.onerror = () => {

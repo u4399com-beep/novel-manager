@@ -125,6 +125,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { novelsApi, type NovelRecord } from '@/api/novels'
 import { chaptersApi, type ChapterRecord } from '@/api/chapters'
 
@@ -169,8 +170,9 @@ onMounted(async () => {
 
     const chRes = await chaptersApi.list(novelId, { size: 10 })
     recentChapters.value = chRes.items
-  } catch (e) {
+  } catch (e: any) {
     console.error('Failed to load novel detail', e)
+    ElMessage.error('加载小说详情失败')
   } finally {
     loading.value = false
   }

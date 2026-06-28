@@ -26,6 +26,9 @@ from bs4 import BeautifulSoup, Tag
 
 from app.crawlers.content_cleaner import clean_content, clean_title, clean_novel_title
 
+# Precompiled regex
+_COLLAPSE_WS = re.compile(r"\s+")
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -106,16 +109,21 @@ HEADERS = {
 }
 
 
+_shared_client: Optional[httpx.AsyncClient] = None
+
+
 async def fetch_url(url: str, timeout: int = 60) -> str:
-    """GET *url* and return the decoded text."""
-    async with httpx.AsyncClient(
-        timeout=timeout,
-        headers=HEADERS,
-        follow_redirects=True,
-    ) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        return resp.text
+    """GET *url* and return the decoded text (reuses shared httpx client)."""
+    global _shared_client
+    if _shared_client is None:
+        _shared_client = httpx.AsyncClient(
+            timeout=timeout,
+            headers=HEADERS,
+            follow_redirects=True,
+        )
+    resp = await _shared_client.get(url)
+    resp.raise_for_status()
+    return resp.text
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +135,7 @@ def _clean_text(text: Optional[str]) -> str:
     """Collapse whitespace."""
     if text is None:
         return ""
-    return re.sub(r"\s+", " ", text).strip()
+    return _COLLAPSE_WS.sub(" ", text).strip()
 
 
 def _extract_field(
@@ -314,12 +322,12 @@ def apply_rule(
         results: list[dict[str, Any]] = []
         for item in items:
             row: dict[str, Any] = {}
-            item_soup = BeautifulSoup(str(item), "lxml")
+            # item is already a parsed Tag — pass directly (avoid re-parse)
             row_context = dict(context or {})
             for field_name, field_spec in field_specs.items():
                 if field_name.startswith("_"):
                     continue
-                val = _extract_field(item_soup, base_url, field_spec, row_context)
+                val = _extract_field(item, base_url, field_spec, row_context)
                 row[field_name] = val
                 row_context[field_name] = val
             results.append(row)

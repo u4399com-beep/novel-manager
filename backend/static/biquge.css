@@ -1,0 +1,57 @@
+/* 笔趣阁风格 */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f5f0e8;color:#333;font-size:14px}
+a{color:#333;text-decoration:none}a:hover{color:#b22222}
+.wrap{width:1000px;margin:0 auto}
+.header{background:#b22222;padding:12px 0;color:#fff}
+.header .wrap{display:flex;justify-content:space-between;align-items:center}
+.logo a{font-size:24px;font-weight:700;color:#fff}
+.search input{border:none;padding:5px 10px;width:200px;border-radius:3px 0 0 3px;outline:none}
+.search button{border:none;padding:5px 14px;background:#8b0000;color:#fff;border-radius:0 3px 3px 0;cursor:pointer}
+.nav{background:#8b0000;padding:0}
+.nav .wrap{display:flex;flex-wrap:wrap}
+.nav a{display:block;padding:10px 16px;color:#fff;font-size:14px}
+.nav a:hover{background:#a52a2a}
+.main{padding:15px 0;display:flex;gap:15px}
+.content{flex:1;min-width:0}
+.sidebar{width:250px}
+
+/* Novel list */
+.novel-list{background:#fff;border:1px solid #e0d5c0}
+.novel-list h2{padding:10px 15px;border-bottom:1px solid #e0d5c0;font-size:16px;background:#fdf5e6}
+.novel-item{display:flex;padding:12px 15px;border-bottom:1px solid #f0ebe0;gap:12px}
+.novel-item:last-child{border-bottom:none}
+.novel-cover{width:80px;height:106px;overflow:hidden;flex-shrink:0}
+.novel-cover img{width:100%;height:100%;object-fit:cover}
+.novel-info{flex:1}
+.novel-info h3{font-size:15px;margin-bottom:5px}
+.novel-info .author{color:#888;font-size:12px;margin-bottom:4px}
+.novel-info .desc{color:#666;font-size:13px;line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* Sidebar */
+.side-card{background:#fff;border:1px solid #e0d5c0;margin-bottom:10px}
+.side-card h3{padding:8px 12px;border-bottom:1px solid #e0d5c0;font-size:14px;background:#fdf5e6}
+.side-card ol{margin:8px 12px 8px 28px;font-size:13px}
+.side-card li{padding:4px 0;border-bottom:1px dotted #e0d5c0}
+.side-card li a{color:#555}.side-card li a:hover{color:#b22222}
+
+/* Chapter */
+.bread{font-size:13px;color:#888;padding:8px 0}
+.chapter-title{font-size:22px;text-align:center;padding:15px 0;border-bottom:1px solid #e0d5c0}
+.chapter-content{font-size:18px;line-height:2;padding:20px 0}
+.chapter-content p{text-indent:2em;margin-bottom:1em}
+.chapter-nav{display:flex;justify-content:space-between;padding:15px 0;border-top:1px solid #e0d5c0}
+
+/* Pagination */
+.pager{text-align:center;padding:15px 0}
+.pager a,.pager span{display:inline-block;padding:5px 12px;margin:0 3px;border:1px solid #ddd;background:#fff;border-radius:3px;font-size:13px}
+.pager .current{background:#b22222;color:#fff;border-color:#b22222}
+
+/* Catalog */
+.catalog{background:#fff;border:1px solid #e0d5c0}
+.catalog h2{padding:10px 15px;border-bottom:1px solid #e0d5c0;font-size:16px;background:#fdf5e6}
+.catalog-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.catalog-grid a{display:block;padding:6px 12px;font-size:13px;border-bottom:1px solid #f5f0e8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.catalog-grid a:hover{background:#fdf5e6;color:#b22222}
+
+.footer{text-align:center;padding:20px 0;color:#999;font-size:12px;border-top:1px solid #e0d5c0;margin-top:20px}

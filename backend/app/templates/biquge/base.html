@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>{% block title %}首页{% endblock %} - {{ site.name if site else '笔趣阁' }}</title>
+<meta name="description" content="{% block description %}{{ site.name if site else '笔趣阁' }} - 免费小说阅读网{% endblock %}">
+<meta name="keywords" content="{% block keywords %}小说,笔趣阁,免费小说,在线阅读{% endblock %}">
+<link rel="stylesheet" href="/static/site.css">
+<link rel="stylesheet" href="/static/biquge.css">
+</head>
+<body>
+<div class="header">
+  <div class="wrap">
+    <div class="logo"><a href="/">{{ site.name if site else '笔趣阁' }}</a></div>
+    <div class="search">
+      <form action="/search" method="get">
+        <input type="text" name="q" placeholder="搜索书名/作者" value="{{ query or '' }}">
+        <button type="submit">搜索</button>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="nav">
+  <div class="wrap">
+    <a href="/">首页</a>
+    {% for cat in (categories or [])[:10] %}
+    <a href="/novels?category={{ cat.id }}">{{ cat.name }}</a>
+    {% endfor %}
+    <a href="/novels">全部</a>
+  </div>
+</div>
+<div class="wrap main">
+  {% block content %}{% endblock %}
+</div>
+<div class="footer">
+  <p>{{ site.name if site else '笔趣阁' }} © 2026</p>
+</div>
+</body>
+</html>

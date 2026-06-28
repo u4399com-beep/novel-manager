@@ -143,7 +143,9 @@ async function handleSubmit() {
 onMounted(async () => {
   try {
     categories.value = await categoriesApi.list()
-  } catch (e) { /* ignore */ }
+  } catch (e: any) {
+    console.error('Failed to load categories', e)
+  }
 
   if (isEdit.value) {
     loading.value = true

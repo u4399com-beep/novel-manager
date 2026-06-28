@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlalchemy import Column, ForeignKey, Integer, String, Table, Text
+from sqlalchemy import Column, ForeignKey, Index, Integer, String, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -44,6 +44,11 @@ class Novel(Base, TimestampMixin):
         back_populates="novel",
         cascade="all, delete-orphan",
         order_by="Chapter.sort_order",
+    )
+
+    __table_args__ = (
+        Index("ix_novels_status_updated", "status", "updated_at"),
+        Index("ix_novels_source_url", "source_url", unique=True),
     )
 
     def __repr__(self) -> str:

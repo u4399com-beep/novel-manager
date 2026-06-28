@@ -7,10 +7,11 @@
 {% block structured_data %}<script type="application/ld+json">{"@context":"https://schema.org","@type":"Book","name":"{{ novel.title }}","author":{"@type":"Person","name":"{{ novel.author }}"},"description":"{{ (novel.description or '')[:500] }}","image":"{{ novel.cover_image_url or '' }}","url":"{{ request.url }}","inLanguage":"zh-CN","numberOfPages":{{ novel.total_chapters }}}</script>{% endblock %}
 
 {% block breadcrumb %}
-<div class="breadcrumb"><div class="content"><a href="/">首页</a> &gt; <strong>{{ novel.title }}</strong></div></div>
+<div class="breadcrumb"><div class="content"><a href="/">{{ T('breadcrumb_home') }}</a> &gt; <strong>{{ novel.title }}</strong></div></div>
 {% endblock %}
 
 {% block content %}
+{% include 'includes/link_wheel.html' %}
 <div class="box view-heading novel-detail-box">
   <div class="novel-cover">
     <div class="module-item-cover">
@@ -27,38 +28,34 @@
     <div class="novel-info-header">
       <h1 class="page-title">{{ novel.title }}</h1>
       <div class="novel-info-aux">
-        <a class="tag-link">作者：{{ novel.author }}</a>
+        <a class="tag-link">{{ T('novel_author') }}{{ novel.author }}</a>
         {% for cat in novel.categories %}<a href="/novels?category={{ cat.id }}" class="tag-link">{{ cat.name }}</a>{% endfor %}
-        <span class="tag-link">{{ novel.total_chapters }} 章</span>
-        <span class="tag-link">{{ '已完结' if novel.status == 'completed' else '连载中' }}</span>
+        <span class="tag-link">{{ novel.total_chapters }} {{ T('chapters_count') }}</span>
+        <span class="tag-link">{{ T('completed') if novel.status == 'completed' else T('ongoing') }}</span>
       </div>
     </div>
     <div class="novel-info-main">
       <div class="novel-info-content">
-        <p>{% if novel.description %}{{ novel.description }}{% else %}暂无简介{% endif %}</p>
+        <p>{% if novel.description %}{{ novel.description }}{% else %}{{ T('no_description') }}{% endif %}</p>
       </div>
     </div>
     <div class="novel-info-footer">
-      <a href="/novel/{{ novel.id }}/chapters" class="btn-large btn-read">开始阅读</a>
+      <a href="/novel/{{ novel.id }}/chapters" class="btn-large btn-read">{{ T('start_reading') }}</a>
     </div>
   </div>
 </div>
 
 <div class="box">
   <div class="module newchapter">
-    <div class="module-heading"><h2 class="module-title">最新章节</h2></div>
-    <div class="module-list">
+    <div class="module-heading"><h2 class="module-title">{{ T('chapter_newest') }}</h2></div>
+    <div class="chapter-grid-sm">
       {% for ch in (chapters or [])[:15] %}
-      <div class="module-row-info">
-        <a class="module-row-text" href="/chapter/{{ ch.id }}" title="{{ ch.title }}">
-          <div class="module-row-title"><span>{{ ch.title }}</span></div>
-        </a>
-      </div>
+      <a href="/chapter/{{ ch.id }}" title="{{ ch.title }}">{{ ch.title }}</a>
       {% endfor %}
     </div>
     {% if novel.total_chapters > 15 %}
     <div style="text-align:center;margin-top:16px">
-      <a href="/novel/{{ novel.id }}/chapters" class="btn-large btn-more">查看全部 {{ novel.total_chapters }} 章</a>
+      <a href="/novel/{{ novel.id }}/chapters" class="btn-large btn-more">{{ T('view_all_chapters')|replace('{count}', novel.total_chapters|string) }}</a>
     </div>
     {% endif %}
   </div>

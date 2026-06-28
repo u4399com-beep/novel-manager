@@ -92,6 +92,17 @@
           </div>
         </el-tab-pane>
 
+        <!-- RANGE ------------------------------------------------------- -->
+        <el-tab-pane label="🔢 书号范围" name="range">
+          <div style="font-size:13px;color:#909399;margin-bottom:8px">按源站书号范围批量创建采集任务并自动队列执行</div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+            <div><div style="font-size:12px;color:#909399;margin-bottom:4px">规则</div><el-select v-model="rangeSource" style="width:100px"><el-option v-for="r in ruleList" :key="r.source_name" :label="r.source_name" :value="r.source_name"/></el-select></div>
+            <div><div style="font-size:12px;color:#909399;margin-bottom:4px">起始ID</div><el-input-number v-model="rangeFrom" :min="1" size="small" style="width:100px"/></div>
+            <div><div style="font-size:12px;color:#909399;margin-bottom:4px">结束ID</div><el-input-number v-model="rangeTo" :min="1" size="small" style="width:100px"/></div>
+            <el-button type="primary" :loading="rangeLoading" :disabled="!rangeSource||rangeFrom<=0||rangeTo<rangeFrom" @click="queueRange">创建并队列采集</el-button>
+          </div>
+        </el-tab-pane>
+
         <!-- PAGE -------------------------------------------------------- -->
         <el-tab-pane label="📄 页面采集" name="page">
           <div style="font-size:13px;color:#909399;margin-bottom:8px">提取 → 测试目录/章节 → 通过后导入采集</div>
@@ -117,7 +128,7 @@
             </div>
             <div v-if="pagePreview.novels.length > 0" style="max-height:360px;overflow-y:auto;border:1px solid #ebeef5;border-radius:4px">
               <el-table :data="pagePreview.novels" size="small" @selection-change="onPageSelectionChange" max-height="340">
-                <el-table-column type="selection" width="36" :selectable="(row:any)=>row._test?.passed"/>
+                <el-table-column type="selection" width="36"/>
                 <el-table-column prop="title" label="小说名称" min-width="180">
                   <template #default="{row}">
                     <span>{{ row.title }}</span>
@@ -157,12 +168,12 @@
               </el-table>
             </div>
             <div style="margin-top:8px;display:flex;gap:8px">
-              <el-button size="small" @click="toggleSelectAll">全选通过 / 取消</el-button>
+              <el-button size="small" @click="toggleSelectAll">全选 / 取消</el-button>
               <el-button size="small" type="primary" :loading="pageTriggerLoading" :disabled="pageSelectedIds.length===0" @click="triggerPageCrawl">
                 导入选中 ({{ pageSelectedIds.length }}) 并采集
               </el-button>
-              <el-button size="small" type="success" :loading="pageTriggerLoading" :disabled="!pageTestDone||pagePassedCount===0" @click="triggerPageCrawlAll">
-                导入全部通过 ({{ pagePassedCount }})
+              <el-button size="small" type="success" :loading="pageTriggerLoading" :disabled="!pagePreview||pagePreview.novels.length===0" @click="triggerPageCrawlAll">
+                全部导入并采集 ({{ pagePreview?.novel_count || 0 }})
               </el-button>
             </div>
           </div>
@@ -171,6 +182,20 @@
 
       </el-tabs>
     </div>
+
+    <!-- Edit Task Dialog -->
+    <el-dialog v-model="showEditDialog" title="编辑任务" width="500px" destroy-on-close>
+      <el-form :model="editForm" label-width="80px">
+        <el-form-item label="小说ID"><el-input v-model="editForm.novel_id" disabled/></el-form-item>
+        <el-form-item label="源站URL"><el-input v-model="editForm.source_url" placeholder="修改源站小说地址"/></el-form-item>
+        <el-form-item label="源站名称"><el-input v-model="editForm.source_name" placeholder="如23qb"/></el-form-item>
+        <el-form-item label="备注信息"><el-input v-model="editForm.error_message" type="textarea" :rows="2"/></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDialog=false">取消</el-button>
+        <el-button type="primary" @click="saveEditDialog">保存</el-button>
+      </template>
+    </el-dialog>
 
     <!-- ============ Live Progress ============ -->
     <LiveProgress
@@ -191,9 +216,19 @@
           </el-select>
           <el-button size="small" :icon="RefreshRight" @click="loadTasks">刷新</el-button>
           <el-checkbox v-model="autoRefresh" size="small">自动</el-checkbox>
+          <el-popconfirm title="启动选中任务?" @confirm="batchStartTasks">
+            <template #reference>
+              <el-button size="small" type="success" :disabled="taskSelectedIds.length===0">批量开始 ({{ taskSelectedIds.length }})</el-button>
+            </template>
+          </el-popconfirm>
+          <el-popconfirm title="按顺序自动采集全部待处理任务?" @confirm="queueStart">
+            <template #reference>
+              <el-button size="small" type="warning">▶ 队列采集</el-button>
+            </template>
+          </el-popconfirm>
           <el-popconfirm title="删除选中任务?" @confirm="batchDeleteTasks">
             <template #reference>
-              <el-button size="small" type="danger" :disabled="taskSelectedIds.length===0">批量删除 ({{ taskSelectedIds.length }})</el-button>
+              <el-button size="small" type="danger" :disabled="taskSelectedIds.length===0">批量删除</el-button>
             </template>
           </el-popconfirm>
         </div>
@@ -212,21 +247,16 @@
         <el-table-column label="开始" width="140"><template #default="{row}">{{ fmt(row.started_at) }}</template></el-table-column>
         <el-table-column label="信息" min-width="160">
           <template #default="{row}">
-            <div v-if="editingTaskId===row.id" style="display:flex;gap:4px">
-              <el-input v-model="editMsg" size="small" style="width:140px"/>
-              <el-button size="small" type="primary" @click="saveTaskEdit(row.id)">保存</el-button>
-              <el-button size="small" @click="editingTaskId=''">取消</el-button>
-            </div>
-            <span v-else-if="row.error_message" :style="{color:row.status==='completed'?'#67c23a':'#f56c6c',fontSize:'12px',cursor:'pointer'}" @dblclick="startEdit(row)">{{ row.error_message }}</span>
-            <span v-else style="color:#c0c4cc;font-size:12px">- (双击编辑)</span>
+            <span v-if="row.error_message" :style="{color:row.status==='completed'?'#67c23a':'#f56c6c',fontSize:'12px'}">{{ row.error_message }}</span>
+            <span v-else style="color:#c0c4cc;font-size:12px">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="240">
+        <el-table-column label="操作" width="260">
           <template #default="{row}">
             <el-button v-if="row.status==='pending'" link size="small" type="success" @click="startTask(row.id)">开始</el-button>
             <el-button v-if="row.status==='running'" link size="small" type="warning" @click="stopTask(row.id)">停止</el-button>
             <el-button v-if="row.status==='failed'||row.status==='completed'" link size="small" type="primary" @click="retryTask(row.id)">重试</el-button>
-            <el-button link size="small" type="info" @click="startEdit(row)">编辑</el-button>
+            <el-button link size="small" type="info" @click="openEditDialog(row)">编辑</el-button>
             <el-popconfirm title="删除?" @confirm="deleteTask(row.id)">
               <template #reference><el-button link size="small" type="danger" :disabled="row.status==='running'">删除</el-button></template>
             </el-popconfirm>
@@ -245,7 +275,7 @@ import { ref,reactive,computed,onMounted,onUnmounted,watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { RefreshRight } from '@element-plus/icons-vue'
 import LiveProgress from '@/components/crawler/LiveProgress.vue'
-import { crawlerApi, type SearchPreviewResult, type PagePreviewResult } from '@/api/crawler'
+import { crawlerApi, type SearchPreviewResult, type PagePreviewResult, type CrawlerTask } from '@/api/crawler'
 import { novelsApi, type NovelRecord } from '@/api/novels'
 
 const baseUrl = window.location.origin
@@ -254,7 +284,7 @@ const activeStreamTaskId = ref('')
 // ---- Rules ----
 const ruleList=ref<any[]>([]),showRuleDialog=ref(false),ruleEditing=ref<string|null>(null),ruleSaving=ref(false)
 const ruleForm=reactive({source_name:'',description:'',base_url:'',jsonText:''})
-async function loadRules(){try{ruleList.value=await crawlerApi.listRules()}catch{}}
+async function loadRules(){try{ruleList.value=await crawlerApi.listRules()}catch(e:any){console.error('Failed to load rules',e);ElMessage.error('加载规则失败')}}
 function openRuleDialog(name?:string){if(name){ruleEditing.value=name;crawlerApi.getRule(name).then(d=>{ruleForm.source_name=d.source_name||name;ruleForm.description=d.description||'';ruleForm.base_url=d.base_url||'';ruleForm.jsonText=JSON.stringify(d,null,2);showRuleDialog.value=true}).catch(()=>ElMessage.error('加载失败'))}else{ruleEditing.value=null;ruleForm.source_name='';ruleForm.description='';ruleForm.base_url='';ruleForm.jsonText='';showRuleDialog.value=true}}
 async function saveRule(){ruleSaving.value=true;try{const d=JSON.parse(ruleForm.jsonText);d.source_name=ruleForm.source_name;d.description=ruleForm.description||d.description;d.base_url=ruleForm.base_url||d.base_url;await crawlerApi.saveRule(ruleForm.source_name,d);ElMessage.success('已保存');showRuleDialog.value=false;ruleEditing.value=null;loadRules()}catch(e:any){ElMessage.error(e.response?.data?.detail||'保存失败')}finally{ruleSaving.value=false}}
 async function deleteRule(name:string){try{await crawlerApi.deleteRule(name);ElMessage.success('已删除');loadRules()}catch(e:any){ElMessage.error(e.response?.data?.detail||'失败')}}
@@ -277,31 +307,36 @@ async function triggerBatch(){if(!batchNovelIds.value.length||!batchSource.value
 const pageUrl=ref(''),pageSource=ref(''),pageFrom=ref(1),pageTo=ref(1),pagePreviewLoading=ref(false),pageTestLoading=ref(false),pageTriggerLoading=ref(false),pagePreview=ref<PagePreviewResult|null>(null),pageError=ref(''),pageSelectedIds=ref<string[]>([]),pageTestDone=ref(false),pagePassedCount=ref(0)
 const pageSelection=ref<any[]>([])
 function onPageSelectionChange(rows:any[]){pageSelection.value=rows;pageSelectedIds.value=rows.map((r:any)=>r.book_id)}
-function toggleSelectAll(){if(!pagePreview.value)return;const passed=pagePreview.value.novels.filter((n:any)=>n._test?.passed);if(pageSelectedIds.value.length===passed.length){pageSelectedIds.value=[]}else{pageSelectedIds.value=passed.map((n:any)=>n.book_id)}}
+function toggleSelectAll(){if(!pagePreview.value)return;const all=pagePreview.value.novels.map((n:any)=>n.book_id);if(pageSelectedIds.value.length===all.length){pageSelectedIds.value=[]}else{pageSelectedIds.value=all}}
 async function doPagePreview(){if(!pageUrl.value)return;pagePreviewLoading.value=true;pagePreview.value=null;pageError.value='';pageTestDone.value=false;pagePassedCount.value=0;try{pagePreview.value=await crawlerApi.pagePreview(pageUrl.value,pageSource.value||undefined,pageFrom.value,pageTo.value);pageSelectedIds.value=[]}catch(e:any){pageError.value=e.response?.data?.detail||'提取失败'}finally{pagePreviewLoading.value=false}}
-async function doPageTest(ids?:string[]){if(!pageUrl.value||!pagePreview.value)return;pageTestLoading.value=true;pageError.value='';const isPartial=ids&&ids.length>0;if(!isPartial)pageTestDone.value=false;try{const r=await crawlerApi.pageTest(pageUrl.value,pageSource.value||undefined,pageFrom.value,pageTo.value,ids);if(isPartial){const novelMap=new Map(pagePreview.value.novels.map((n:any)=>[n.book_id,n]));for(const n of r.novels){const existing=novelMap.get(n.book_id);if(existing)Object.assign(existing,{_test:n._test,_testing:false})}pagePassedCount.value=pagePreview.value.novels.filter((n:any)=>n._test?.passed).length;pageTestDone.value=pagePreview.value.novels.every((n:any)=>n._test!==null&&n._test!==undefined)}else{pagePreview.value.novels=r.novels;pagePassedCount.value=r.passed;pageTestDone.value=true}if(r.failed>0)ElMessage.warning(`${r.passed}/${r.total} 通过，${r.failed} 失败`);else ElMessage.success(`${r.total} 本全部通过!`)}catch(e:any){pageError.value=e.response?.data?.detail||'测试失败'}finally{pageTestLoading.value=false}}
+async function doPageTest(ids?:string[]){if(!pageUrl.value||!pagePreview.value)return;pageTestLoading.value=true;pageError.value='';try{const r=await crawlerApi.pageTest(pageUrl.value,pageSource.value||undefined,pageFrom.value,pageTo.value,ids);const novelMap=new Map(pagePreview.value.novels.map((n:any)=>[n.book_id,n]));for(const n of r.novels){const existing=novelMap.get(n.book_id);if(existing)Object.assign(existing,{_test:n._test,_testing:false})}pagePassedCount.value=pagePreview.value.novels.filter((n:any)=>n._test?.passed).length;pageTestDone.value=pagePreview.value.novels.every((n:any)=>n._test!==null&&n._test!==undefined);if(r.failed>0)ElMessage.warning(`${r.passed}/${r.total} 通过，${r.failed} 失败`);else ElMessage.success(`${r.total} 本全部通过!`)}catch(e:any){pageError.value=e.response?.data?.detail||'测试失败'}finally{pageTestLoading.value=false}}
 async function triggerPageCrawl(){if(!pageSelectedIds.value.length||!pageUrl.value||!pageSource.value)return;pageTriggerLoading.value=true;try{const r=await crawlerApi.triggerPage(pageUrl.value,pageSource.value,pageSelectedIds.value,pageFrom.value,pageTo.value);ElMessage.success(r.message);pagePreview.value=null;loadTasks()}catch(e:any){ElMessage.error(e.response?.data?.detail||'失败')}finally{pageTriggerLoading.value=false}}
-async function triggerPageCrawlAll(){if(!pageUrl.value||!pageSource.value)return;pageTriggerLoading.value=true;const passedIds=pagePreview.value?.novels.filter((n:any)=>n._test?.passed).map((n:any)=>n.book_id)||[];try{const r=await crawlerApi.triggerPage(pageUrl.value,pageSource.value,passedIds,pageFrom.value,pageTo.value);ElMessage.success(r.message);pagePreview.value=null;loadTasks()}catch(e:any){ElMessage.error(e.response?.data?.detail||'失败')}finally{pageTriggerLoading.value=false}}
+async function triggerPageCrawlAll(){if(!pageUrl.value||!pageSource.value)return;pageTriggerLoading.value=true;try{const r=await crawlerApi.triggerPage(pageUrl.value,pageSource.value,undefined,pageFrom.value,pageTo.value);ElMessage.success(r.message);pagePreview.value=null;loadTasks()}catch(e:any){ElMessage.error(e.response?.data?.detail||'失败')}finally{pageTriggerLoading.value=false}}
 
 // ---- Tasks ----
-const loading=ref(false),tasks=ref<any[]>([]),filterStatus=ref(''),autoRefresh=ref(true);let timer:any=null
+const loading=ref(false),tasks=ref<CrawlerTask[]>([]),filterStatus=ref(''),autoRefresh=ref(true);let timer:any=null
 const pagination=reactive({page:1,size:20,total:0})
-const editingTaskId=ref(''),editMsg=ref(''),taskSelectedIds=ref<string[]>([])
+const showEditDialog=ref(false),editForm=reactive({novel_id:'',source_url:'',source_name:'',error_message:'',task_id:''})
+const taskSelectedIds=ref<string[]>([])
 function statusType(s:string){const m:Record<string,string>={pending:'info',running:'warning',completed:'success',failed:'danger'};return m[s]||'info'}
 function statusLabel(s:string){const m:Record<string,string>={pending:'等待中',running:'运行中',completed:'已完成',failed:'失败'};return m[s]||s}
 function fmt(d:string|null){return d?new Date(d).toLocaleString('zh-CN'):'-'}
 function elapsed(row:any){if(!row.started_at)return'-';const end=row.finished_at?new Date(row.finished_at):new Date();const s=(end.getTime()-new Date(row.started_at).getTime())/1000;if(s<60)return`${Math.round(s)}秒`;return`${Math.floor(s/60)}分${Math.round(s%60)}秒`}
 function onTaskSelectionChange(rows:any[]){taskSelectedIds.value=rows.map((r:any)=>r.id)}
-function startEdit(row:any){editingTaskId.value=row.id;editMsg.value=row.error_message||''}
-async function saveTaskEdit(id:string){try{await crawlerApi.updateTask(id,{error_message:editMsg.value});ElMessage.success('已更新');editingTaskId.value='';loadTasks()}catch(e:any){ElMessage.error('更新失败')}}
+function openEditDialog(row:any){editForm.task_id=row.id;editForm.novel_id=row.novel_id;editForm.source_url='';editForm.source_name='';editForm.error_message=row.error_message||'';showEditDialog.value=true}
+async function saveEditDialog(){try{const data:any={error_message:editForm.error_message};if(editForm.source_url){data.source_url=editForm.source_url;if(editForm.source_name)data.source_name=editForm.source_name}await crawlerApi.updateTask(editForm.task_id,data);ElMessage.success('已更新');showEditDialog.value=false;loadTasks()}catch(e:any){ElMessage.error('更新失败')}}
+async function batchStartTasks(){if(!taskSelectedIds.value.length)return;try{const r=await crawlerApi.batchStartTasks(taskSelectedIds.value);ElMessage.success(`启动 ${r.started} 个, 失败 ${r.failed} 个`);loadTasks()}catch(e:any){ElMessage.error('批量开始失败')}}
+async function queueStart(){try{const r=await crawlerApi.queueStart();ElMessage.success(r.message);loadTasks()}catch(e:any){ElMessage.error(e.response?.data?.detail||'队列启动失败')}}
+const rangeSource=ref('23qb'),rangeFrom=ref(12400),rangeTo=ref(12500),rangeLoading=ref(false)
+async function queueRange(){if(!rangeSource.value||rangeFrom.value<=0||rangeTo.value<rangeFrom.value)return;rangeLoading.value=true;try{const r=await crawlerApi.queueRange(rangeSource.value,rangeFrom.value,rangeTo.value);ElMessage.success(r.message);loadTasks()}catch(e:any){ElMessage.error(e.response?.data?.detail||'失败')}finally{rangeLoading.value=false}}
 async function startTask(id:string){try{await crawlerApi.startTask(id);ElMessage.success('任务已开始');loadTasks()}catch(e:any){ElMessage.error(e.response?.data?.detail||'启动失败')}}
 async function stopTask(id:string){try{await crawlerApi.stopTask(id);ElMessage.success('任务已停止');loadTasks()}catch(e:any){ElMessage.error(e.response?.data?.detail||'停止失败')}}
 async function retryTask(id:string){try{await crawlerApi.retryTask(id);ElMessage.success('已提交重试');loadTasks()}catch(e:any){ElMessage.error(e.response?.data?.detail||'重试失败')}}
-async function loadTasks(){loading.value=true;try{const r=await crawlerApi.listTasks({status:filterStatus.value||undefined,page:pagination.page,size:pagination.size});tasks.value=r.items;pagination.total=r.total}catch{}finally{loading.value=false}}
+async function loadTasks(){loading.value=true;try{const r=await crawlerApi.listTasks({status:filterStatus.value||undefined,page:pagination.page,size:pagination.size});tasks.value=r.items;pagination.total=r.total}catch(e:any){console.error('Failed to load tasks',e);ElMessage.error('加载任务列表失败')}finally{loading.value=false}}
 async function deleteTask(id:string){try{await crawlerApi.deleteTask(id);ElMessage.success('已删除');loadTasks()}catch(e:any){ElMessage.error(e.response?.data?.detail||'失败')}}
 async function batchDeleteTasks(){if(!taskSelectedIds.value.length)return;try{const r=await crawlerApi.batchDeleteTasks(taskSelectedIds.value);ElMessage.success(`删除 ${r.deleted} 个，跳过 ${r.skipped} 个运行中`);taskSelectedIds.value=[];loadTasks()}catch(e:any){ElMessage.error('批量删除失败')}}
 watch(autoRefresh,(on)=>{if(on)timer=setInterval(loadTasks,5000);else{clearInterval(timer);timer=null}})
 
-onMounted(async()=>{await loadRules();try{const r=await novelsApi.list({size:200});novels.value=r.items}catch{};loadTasks();if(autoRefresh.value)timer=setInterval(loadTasks,5000)})
+onMounted(async()=>{await loadRules();try{const r=await novelsApi.list({size:200});novels.value=r.items}catch(e:any){console.error('Failed to load novels',e)};loadTasks();if(autoRefresh.value)timer=setInterval(loadTasks,5000)})
 onUnmounted(()=>{if(timer)clearInterval(timer)})
 </script>

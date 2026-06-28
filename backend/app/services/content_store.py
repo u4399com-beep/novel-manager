@@ -15,6 +15,7 @@ Performance characteristics (vs DB TEXT):
     - DB load:  dramatically reduced (no large TEXT blobs in queries)
 """
 
+import asyncio
 import gzip
 import os
 import time
@@ -28,8 +29,8 @@ from typing import Optional
 # ---------------------------------------------------------------------------
 
 CONTENT_ROOT = Path("data/content")
-MAX_CACHE_ITEMS = 200   # keep the 200 most-recently-read chapters in memory
-MAX_CACHE_BYTES = 32 * 1024 * 1024  # 32 MiB max
+MAX_CACHE_ITEMS = 100   # keep the 100 most-recently-read chapters in memory
+MAX_CACHE_BYTES = 16 * 1024 * 1024  # 16 MiB max
 
 # ---------------------------------------------------------------------------
 # LRU cache
@@ -145,3 +146,21 @@ def _add_to_cache(key: str, text: str):
     while _cache and (_cache_bytes > MAX_CACHE_BYTES or len(_cache) > MAX_CACHE_ITEMS):
         oldest_key, oldest_val = _cache.popitem(last=False)
         _cache_bytes -= len(oldest_val)
+
+
+# ── Async wrappers (offload blocking I/O to thread pool) ──────────────
+
+
+async def awrite_content(novel_id: str, chapter_id: str, text: str) -> str:
+    """Async wrapper for :func:`write_content`."""
+    return await asyncio.to_thread(write_content, novel_id, chapter_id, text)
+
+
+async def aread_content(novel_id: str, chapter_id: str, file_path: str = "") -> str:
+    """Async wrapper for :func:`read_content`."""
+    return await asyncio.to_thread(read_content, novel_id, chapter_id, file_path)
+
+
+async def adelete_content(novel_id: str, chapter_id: str, file_path: str = "") -> None:
+    """Async wrapper for :func:`delete_content`."""
+    return await asyncio.to_thread(delete_content, novel_id, chapter_id, file_path)

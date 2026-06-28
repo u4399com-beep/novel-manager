@@ -1,0 +1,30 @@
+/* 香书中文 — 暖橙风格 */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei",sans-serif;background:#fdf5e6;color:#333;font-size:14px}
+a{color:#333;text-decoration:none}a:hover{color:#d2691e}
+.wrap{width:1050px;margin:0 auto}
+.header{background:#d2691e;padding:12px 0}
+.header .wrap{display:flex;justify-content:space-between;align-items:center}
+.logo a{font-size:24px;font-weight:700;color:#fff}
+.search input{border:none;padding:5px 10px;width:200px;border-radius:3px 0 0 3px}
+.search button{background:#8b4513;color:#fff;border:none;padding:5px 14px;border-radius:0 3px 3px 0;cursor:pointer}
+.nav{background:#fdf5e6;border-bottom:2px solid #d2691e}
+.nav .wrap{display:flex;flex-wrap:wrap}
+.nav a{display:block;padding:10px 16px;color:#555;font-size:14px}
+.nav a:hover{color:#d2691e;background:#fff5e8}
+.main{padding:15px 0;display:flex;gap:15px}
+.content{flex:1;min-width:0}
+.sidebar{width:250px}
+.novel-list{background:#fff;border:1px solid #f0d8b0;margin-bottom:12px}
+.novel-list h2{padding:10px 15px;background:#fef5e7;border-bottom:1px solid #f0d8b0;font-size:16px;color:#d2691e}
+.novel-item{display:flex;padding:12px;border-bottom:1px solid #fef5e7;gap:12px}
+.novel-cover{width:80px;height:106px;overflow:hidden;flex-shrink:0}
+.side-card{background:#fff;border:1px solid #f0d8b0;margin-bottom:10px}
+.side-card h3{padding:8px 12px;background:#fef5e7;border-bottom:1px solid #f0d8b0;font-size:14px;color:#d2691e}
+.chapter-content{font-size:18px;line-height:2;padding:20px}
+.chapter-content p{text-indent:2em;margin-bottom:1em}
+.catalog-grid{display:grid;grid-template-columns:repeat(4,1fr);background:#fff}
+.catalog-grid a{padding:8px 12px;font-size:13px;border-bottom:1px solid #fef5e7}
+.pager{text-align:center;padding:15px}.pager a,.pager span{padding:5px 12px;margin:0 3px;border:1px solid #ddd;border-radius:3px}
+.pager .current{background:#d2691e;color:#fff}
+.footer{text-align:center;padding:20px 0;color:#999;font-size:12px;border-top:2px solid #d2691e;margin-top:20px}

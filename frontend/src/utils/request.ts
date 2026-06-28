@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import router from '@/router'
 
 const request = axios.create({
   baseURL: '/api/v1',
@@ -28,7 +29,7 @@ request.interceptors.response.use(
     if (error.response?.status === 401) {
       const authStore = useAuthStore()
       authStore.logout()
-      window.location.href = '/login'
+      router.push('/login')
     } else if (error.response?.status === 403) {
       ElMessage.error('Permission denied')
     } else if (error.response?.status === 404) {

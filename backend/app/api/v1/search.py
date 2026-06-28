@@ -1,7 +1,8 @@
+"""Search API — FULLTEXT for chapters; ILIKE for novels."""
 import math
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select, union_all
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -13,6 +14,16 @@ from app.schemas.novel import NovelRead
 router = APIRouter()
 
 
+def _match_clause(column, query: str):
+    """Return MATCH AGAINST for FULLTEXT; ILIKE fallback for short queries."""
+    # For 1-char queries, FULLTEXT ngram may not match well — use ILIKE
+    if len(query.strip()) <= 1:
+        return column.ilike(f"%{query}%")
+    # Escape special FULLTEXT operators and use BOOLEAN MODE
+    safe_q = query.replace("'", "''").replace('"', '""')
+    return column.match(safe_q)
+
+
 @router.get("")
 async def search(
     q: str = Query(min_length=1, description="Search query"),
@@ -21,7 +32,7 @@ async def search(
     size: int = 20,
     db: AsyncSession = Depends(get_db),
 ):
-    """Search across novels or chapters using LIKE matching."""
+    """Search across novels or chapters."""
     if type == "novel":
         query = (
             select(Novel)
@@ -41,14 +52,10 @@ async def search(
         result = await db.execute(query)
         items = [NovelRead.model_validate(n) for n in result.unique().scalars().all()]
 
-    else:  # chapter
-        query = (
-            select(Chapter)
-            .where(
-                Chapter.title.ilike(f"%{q}%")
-                | Chapter.content.ilike(f"%{q}%")
-            )
-        )
+    else:  # chapter — use FULLTEXT index for fast search
+        match_filter = _match_clause(Chapter.title, q)
+        query = select(Chapter).where(match_filter)
+
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await db.execute(count_query)
         total = total_result.scalar() or 0

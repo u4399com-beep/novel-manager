@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>{% block title %}首页{% endblock %} - {{ site.name if site else '提子小说网' }}</title>
+<meta name="description" content="{% block description %}{{ site.name if site else '提子小说网' }} - 清新阅读，品味书香{% endblock %}">
+<meta name="keywords" content="{% block keywords %}提子小说,在线阅读,免费小说,网络文学{% endblock %}">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="{{ request.url }}">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}">
+<meta property="og:title" content="{{ self.title() }}">
+<meta property="og:description" content="{{ self.description() }}">
+<meta property="og:url" content="{{ request.url }}">
+{% block og_extra %}{% endblock %}
+{% block structured_data %}{% endblock %}
+<link rel="stylesheet" href="/static/site.css">
+<link rel="stylesheet" href="/static/teezi.css">
+</head>
+<body>
+<div class="header">
+  <div class="wrap">
+    <div class="logo"><a href="/">{{ site.name if site else '提子小说网' }}</a></div>
+    <div class="search">
+      <form action="/search" method="get">
+        <input type="text" name="q" placeholder="输入书名/作者搜索" value="{{ query or '' }}">
+        <button type="submit">搜索</button>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="nav">
+  <div class="wrap">
+    <a href="/">首页</a>
+    {% for cat in (categories or [])[:10] %}
+    <a href="/novels?category={{ cat.id }}">{{ cat.name }}</a>
+    {% endfor %}
+    <a href="/novels">全部小说</a>
+  </div>
+</div>
+{% block breadcrumb %}{% endblock %}
+<div class="main">
+  <div class="content">
+    {% block content %}{% endblock %}
+  </div>
+  <aside class="sidebar">
+    {% block sidebar %}{% endblock %}
+  </aside>
+</div>
+<div class="footer">
+  <p>{{ site.name if site else '提子小说网' }} © 2026 · 绿色阅读，健康上网</p>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

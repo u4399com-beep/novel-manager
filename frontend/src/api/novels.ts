@@ -33,6 +33,26 @@ export interface NovelParams {
   sort_dir?: string
 }
 
+export interface NovelStatistics {
+  total_chapters: number
+  total_words: number
+  average_words_per_chapter: number
+  chapters_by_volume: Record<string, number>
+  first_chapter_date: string | null
+  latest_chapter_date: string | null
+}
+
+export interface CreateNovelPayload {
+  title: string
+  author: string
+  description?: string
+  cover_image_url?: string
+  source_url?: string
+  source_name?: string
+  status?: string
+  category_ids?: number[]
+}
+
 export const novelsApi = {
   list(params: NovelParams): Promise<NovelListResponse> {
     return request.get('/novels', { params }).then((r) => r.data)
@@ -42,11 +62,11 @@ export const novelsApi = {
     return request.get(`/novels/${id}`).then((r) => r.data)
   },
 
-  create(data: FormData | Record<string, any>): Promise<NovelRecord> {
+  create(data: FormData | CreateNovelPayload): Promise<NovelRecord> {
     return request.post('/novels', data).then((r) => r.data)
   },
 
-  update(id: string, data: Record<string, any>): Promise<NovelRecord> {
+  update(id: string, data: Partial<CreateNovelPayload>): Promise<NovelRecord> {
     return request.put(`/novels/${id}`, data).then((r) => r.data)
   },
 
@@ -60,7 +80,7 @@ export const novelsApi = {
     return request.post(`/novels/${id}/cover`, formData).then((r) => r.data)
   },
 
-  statistics(id: string): Promise<any> {
+  statistics(id: string): Promise<NovelStatistics> {
     return request.get(`/novels/${id}/statistics`).then((r) => r.data)
   },
 }

@@ -8,6 +8,15 @@ export interface RuleMeta {
   version: string
 }
 
+export interface RuleData {
+  source_name: string
+  description: string
+  base_url: string
+  version: string
+  selectors?: Record<string, any>
+  [key: string]: any
+}
+
 export interface TestRequest {
   source_name: string
   section: 'search' | 'novel_info' | 'catalog' | 'chapter'
@@ -31,11 +40,11 @@ export const rulesApi = {
     return request.get('/rules').then((r) => r.data)
   },
 
-  get(sourceName: string): Promise<any> {
+  get(sourceName: string): Promise<RuleData> {
     return request.get(`/rules/${sourceName}`).then((r) => r.data)
   },
 
-  save(sourceName: string, data: any): Promise<any> {
+  save(sourceName: string, data: RuleData): Promise<RuleData> {
     return request.put(`/rules/${sourceName}`, { source_name: sourceName, data }).then((r) => r.data)
   },
 

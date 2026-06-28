@@ -95,6 +95,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { Search, Plus } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { novelsApi, type NovelRecord } from '@/api/novels'
 import { categoriesApi, type CategoryRecord } from '@/api/categories'
 
@@ -148,8 +149,9 @@ async function loadNovels() {
     })
     novels.value = res.items
     pagination.total = res.total
-  } catch (e) {
+  } catch (e: any) {
     console.error('Failed to load novels', e)
+    ElMessage.error('加载小说列表失败')
   } finally {
     loading.value = false
   }
@@ -159,15 +161,18 @@ async function handleDelete(id: string) {
   try {
     await novelsApi.delete(id)
     await loadNovels()
-  } catch (e) {
+  } catch (e: any) {
     console.error('Failed to delete novel', e)
+    ElMessage.error('删除失败')
   }
 }
 
 onMounted(async () => {
   try {
     categories.value = await categoriesApi.list()
-  } catch (e) { /* ignore */ }
+  } catch (e: any) {
+    console.error('Failed to load categories', e)
+  }
   loadNovels()
 })
 </script>

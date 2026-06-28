@@ -52,10 +52,15 @@ export const crawlerApi = {
     request.get('/crawler/tasks', { params }).then(r => r.data),
   getTask: (id: string): Promise<CrawlerTask> => request.get(`/crawler/tasks/${id}`).then(r => r.data),
   deleteTask: (id: string) => request.delete(`/crawler/tasks/${id}`),
-  updateTask: (id: string, data: any) => request.put(`/crawler/tasks/${id}`, data).then(r => r.data),
+  updateTask: (id: string, data: Record<string, unknown>) => request.put(`/crawler/tasks/${id}`, data).then(r => r.data),
   startTask: (id: string): Promise<CrawlerTask> => request.post(`/crawler/tasks/${id}/start`).then(r => r.data),
   stopTask: (id: string): Promise<CrawlerTask> => request.post(`/crawler/tasks/${id}/stop`).then(r => r.data),
   retryTask: (id: string): Promise<CrawlerTask> => request.post(`/crawler/tasks/${id}/retry`).then(r => r.data),
+  batchStartTasks: (ids: string[]): Promise<any> => request.post('/crawler/tasks/batch-start', { ids }).then(r => r.data),
+  queueStart: (): Promise<any> => request.post('/crawler/tasks/queue-start').then(r => r.data),
+  queueRange: (sourceName: string, bookFrom: number, bookTo: number): Promise<any> =>
+    request.post('/crawler/tasks/queue-range', { source_name: sourceName, book_from: bookFrom, book_to: bookTo }).then(r => r.data),
+  queueStatus: (): Promise<any> => request.get('/crawler/tasks/queue-status').then(r => r.data),
   batchDeleteTasks: (ids: string[]): Promise<any> => request.post('/crawler/tasks/batch-delete', { ids }).then(r => r.data),
 
   // -- Rules --

@@ -8,10 +8,11 @@
 {% endblock %}
 
 {% block breadcrumb %}
-<nav class="breadcrumb"><div class="content"><a href="/">首页</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; <strong>目录（{{ total }}章）</strong></div></nav>
+<nav class="breadcrumb"><div class="content"><a href="/">{{ T('breadcrumb_home') }}</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; <strong>{{ T('catalog') }}（{{ total }}{{ T('chapters_count') }}）</strong></div></nav>
 {% endblock %}
 
 {% block content %}
+{% include 'includes/link_wheel.html' %}
 <div class="box">
   <div class="catalog-header">
     <h1 class="page-title">{{ novel.title }}</h1>

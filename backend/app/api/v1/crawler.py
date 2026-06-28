@@ -1,9 +1,12 @@
 """Crawler API — trigger, batch, search-match, monitor, manage."""
 
 import asyncio
+import logging
 import math
 from datetime import datetime, timezone
 from typing import Optional
+
+from sqlalchemy import func, select
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -17,6 +20,7 @@ from app.models.user import User
 from app.schemas.crawler import CrawlerSourceInfo, CrawlerTaskRead, CrawlerTrigger
 from app.crawlers.page_extractor import extract_page_links, test_all_novels
 from app.services import crawler_service
+from app.models.crawler_task import CrawlerTask as CrawlerTaskModel
 from app.services.crawl_session import stream_events
 from app.services.novel_service import get_novel, create_novel
 from app.schemas.novel import NovelCreate
@@ -170,9 +174,11 @@ async def trigger_batch_crawl(
         tasks.append({"task_id": str(task.id), "novel_id": nid})
 
     await db.commit()
-    _running_tasks.add(asyncio.ensure_future(_run_batch_in_session(
+    task = asyncio.create_task(_run_batch_in_session(
         [t["task_id"] for t in tasks], data.mode,
-    )))
+    ))
+    task.add_done_callback(lambda t: _running_tasks.discard(t))
+    _running_tasks.add(task)
 
     return {
         "message": f"Batch queued: {len(tasks)} novels (mode={data.mode})",
@@ -304,9 +310,9 @@ async def trigger_page_crawl(
         from sqlalchemy import select as sa_select
         from app.models.novel import Novel as NovelModel
         existing = await db.execute(
-            sa_select(NovelModel).where(NovelModel.title == title)
+            select(NovelModel).where(NovelModel.title == title).limit(1)
         )
-        novel = existing.scalar_one_or_none()
+        novel = existing.scalars().first()
 
         if novel:
             # Update missing fields
@@ -348,7 +354,9 @@ async def trigger_page_crawl(
                                         await s.flush()
                     except Exception:
                         pass
-                _running_tasks.add(asyncio.ensure_future(_download_cover(str(novel.id), cover_url)))
+                cover_task = asyncio.create_task(_download_cover(str(novel.id), cover_url))
+                cover_task.add_done_callback(lambda t: _running_tasks.discard(t))
+                _running_tasks.add(cover_task)
             imported_count += 1
 
         await db.flush()
@@ -421,6 +429,284 @@ async def list_tasks(
     }
 
 
+@router.post("/tasks/queue-range", status_code=200)
+async def queue_range_start(
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Queue crawl by book ID range on a source site.
+
+    Body: {"source_name":"23qb", "book_from":12400, "book_to":12500}
+    Creates tasks for /book/{id}/ URLs and starts queue processing.
+    """
+    from app.models.novel import Novel as NovelModel
+    source_name = data.get("source_name", "23qb")
+    book_from = int(data.get("book_from", 0))
+    book_to = int(data.get("book_to", 0))
+    if book_from <= 0 or book_to < book_from:
+        raise HTTPException(status_code=400, detail="Invalid book range")
+
+    base = f"https://www.23qb.net/book/"
+    created = 0; skipped = 0
+    for bid in range(book_from, book_to + 1):
+        title = f"Book-{bid}"
+        url = f"{base}{bid}/"
+        # Skip if already exists
+        existing = (await db.execute(
+            select(NovelModel).where(NovelModel.source_url == url)
+        )).scalars().first()
+        if existing:
+            # Create task for existing novel (update crawl)
+            task = CrawlerTaskModel(novel_id=existing.id, status="pending")
+            db.add(task); skipped += 1
+        else:
+            novel = NovelModel(title=title, author="", source_url=url, source_name=source_name)
+            db.add(novel); await db.flush()
+            task = CrawlerTaskModel(novel_id=novel.id, status="pending")
+            db.add(task); created += 1
+    await db.commit()
+
+    # Start queue
+    global _queue_running
+    if not _queue_running:
+        _queue_running = True
+        asyncio.create_task(_queue_worker())
+
+    return {"message": f"已创建 {created} 新书 + {skipped} 已有, 共 {created+skipped} 个任务排队", "created": created, "skipped": skipped}
+
+
+@router.post("/tasks/queue-reset", status_code=200)
+async def queue_reset():
+    """Reset stuck queue."""
+    global _queue_running
+    _queue_running = False
+    return {"message": "队列已重置"}
+
+
+@router.post("/tasks/repair-placeholders", status_code=200)
+async def repair_placeholder_titles(
+    data: dict = {},
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Scan for novels with Book-XXXX / Chapter-XXXX placeholders and fix titles.
+
+    Visits each novel's source_url and extracts the real title.
+
+    Body (optional):
+        limit: max books to repair (default 10, max 100)
+        offset: skip first N books (default 0)
+    """
+    from app.models.novel import Novel as NovelModel
+    from app.crawlers.anti_detect import SmartClient
+    from bs4 import BeautifulSoup
+    import re as _re
+
+    limit = min(int(data.get("limit", 10)), 100)
+    offset = int(data.get("offset", 0))
+
+    # Count total
+    count_q = select(func.count()).where(
+        (NovelModel.title.startswith("Book-")) |
+        (NovelModel.title.startswith("Chapter-"))
+    )
+    total = (await db.execute(count_q)).scalar() or 0
+
+    if total == 0:
+        return {"message": "No placeholder titles found", "fixed": 0, "total": 0}
+
+    # Fetch batch
+    q = select(NovelModel).where(
+        (NovelModel.title.startswith("Book-")) |
+        (NovelModel.title.startswith("Chapter-"))
+    ).order_by(NovelModel.created_at.desc()).offset(offset).limit(limit)
+    result = await db.execute(q)
+    novels = result.scalars().all()
+
+    if not novels:
+        return {"message": "Empty batch", "fixed": 0, "total": total, "offset": offset}
+
+    fixed = 0
+    details: list[dict] = []
+
+    async with SmartClient(min_delay=0.2, max_delay=0.8) as client:
+        for novel in novels:
+            if not novel.source_url:
+                details.append({"id": str(novel.id), "old": novel.title, "new": novel.title, "error": "no source_url"})
+                continue
+
+            try:
+                html = await client.get(novel.source_url)
+                soup = BeautifulSoup(html, "lxml")
+
+                # Extract title using multiple strategies (prioritize meta tags)
+                title = ""
+                # Strategy 1: og:novel:book_name (23qb-specific)
+                meta = soup.select_one('meta[property="og:novel:book_name"]')
+                if meta:
+                    title = meta.get("content", "").strip()
+
+                # Strategy 2: <title> tag
+                if not title:
+                    title_tag = soup.select_one("title")
+                    if title_tag:
+                        raw = title_tag.get_text(strip=True)
+                        for sep in (" - ", " | ", " — ", "・", "·"):
+                            if sep in raw:
+                                raw = raw.rsplit(sep, 1)[0].strip()
+                        if raw and 1 < len(raw) < 100:
+                            title = raw
+
+                # Strategy 3: h1
+                if not title:
+                    for sel in ["h1", ".page-title", ".novel-title", ".book-title"]:
+                        el = soup.select_one(sel)
+                        if el:
+                            txt = el.get_text(strip=True)
+                            if txt and 1 < len(txt) < 80:
+                                title = txt
+                                break
+
+                # Reject obvious error/noise titles
+                _bad_titles = {
+                    "出现错误", "错误页面", "404", "Error", "error",
+                    "页面不存在", "Not Found", "铅笔小说", "23qb",
+                    "笔趣阁", "小说大全", "全本小说网", "趣读小说", "提子小说网", "香书中文",
+                }
+                _is_bad = any(bad in title for bad in _bad_titles) and len(title) < 20
+                if title and title != novel.title and not title.startswith("Book-") and not title.startswith("Chapter-") and len(title) > 1 and not _is_bad:
+                    old = novel.title
+                    novel.title = title
+                    fixed += 1
+                    details.append({"id": str(novel.id), "old": old, "new": title})
+                else:
+                    details.append({"id": str(novel.id), "old": novel.title, "new": novel.title,
+                                    "error": "title not found or unchanged"})
+
+            except Exception as e:
+                details.append({"id": str(novel.id), "old": novel.title, "new": novel.title, "error": str(e)[:200]})
+
+    if fixed > 0:
+        await db.commit()
+
+    return {
+        "message": f"Fixed {fixed}/{len(novels)} in batch (offset={offset}, total={total})",
+        "fixed": fixed,
+        "batch": len(novels),
+        "total": total,
+        "offset": offset,
+        "has_more": offset + limit < total,
+        "details": details,
+    }
+
+
+_queue_log = logging.getLogger("crawler.queue")
+
+
+async def _queue_worker():
+    """Robust queue processor with built-in watchdog."""
+    global _queue_running
+    fails = 0
+    last_completed = 0  # track completed task count for stuck detection
+
+    async def _completed_count():
+        async with async_session_factory() as s:
+            return (await s.execute(select(func.count()).where(CrawlerTaskModel.status=="completed"))).scalar() or 0
+
+    last_completed = await _completed_count()
+    stuck_checks = 0
+
+    while _queue_running:
+        tid = ""
+        try:
+            # FRESH session per task — prevents lock-wait cascade
+            async with async_session_factory() as db:
+                t = (await db.execute(
+                    select(CrawlerTaskModel).where(CrawlerTaskModel.status=="pending")
+                    .order_by(CrawlerTaskModel.created_at).limit(1)
+                )).scalars().first()
+                if not t:
+                    _queue_log.info("Queue empty — stopping")
+                    break
+                tid = str(t.id)
+                await asyncio.wait_for(
+                    crawler_service.run_crawl(db, tid, mode="direct"), timeout=600)
+                fails = 0; stuck_checks = 0
+                await asyncio.sleep(0.3)
+        except asyncio.TimeoutError:
+            fails += 1; _queue_log.warning(f"Task {tid[:12]}... timeout")
+        except Exception as e:
+            fails += 1
+            if 'Lock wait' in str(e) or 'rollback' in str(e):
+                _queue_log.warning(f"DB lock — retry after backoff")
+                await asyncio.sleep(5)
+                continue
+            _queue_log.warning(f"Task {tid[:12]}... failed: {str(e)[:100]}")
+
+        # Watchdog: detect stuck (running but not completing)
+        if fails > 0:
+            stuck_checks += 1
+        if stuck_checks >= 10:
+            new_completed = await _completed_count()
+            if new_completed == last_completed:
+                _queue_log.warning("⚠️ Watchdog: 队列运行但未推进 → 重置重启")
+                _queue_running = False
+                await asyncio.sleep(3)
+                start_queue()
+                return  # new worker takes over
+            last_completed = new_completed
+            stuck_checks = 0; fails = 0
+
+        if fails >= 20:
+            _queue_log.error("Too many failures — stopping")
+            break
+
+    _queue_running = False
+    # Auto-restart if tasks remain
+    await asyncio.sleep(5)
+    async with async_session_factory() as s:
+        remaining = (await s.execute(select(func.count()).where(CrawlerTaskModel.status=="pending"))).scalar() or 0
+    if remaining > 0:
+        _queue_log.info(f"Auto-restart: {remaining} tasks remain")
+        start_queue()
+
+
+@router.get("/stats", status_code=200)
+async def system_stats(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """System-wide statistics (cached 10s for dashboard auto-refresh)."""
+    from app.services.redis_cache import get_or_compute
+    from app.models.novel import Novel as NovelModel
+    import json, os, glob, subprocess
+    from sqlalchemy import text as sa_text
+
+    async def _compute():
+        total_t = (await db.execute(select(func.count()).select_from(CrawlerTaskModel))).scalar() or 0
+        pending_t = (await db.execute(select(func.count()).where(CrawlerTaskModel.status=="pending"))).scalar() or 0
+        completed_t = (await db.execute(select(func.count()).where(CrawlerTaskModel.status=="completed"))).scalar() or 0
+        failed_t = (await db.execute(select(func.count()).where(CrawlerTaskModel.status=="failed"))).scalar() or 0
+        total_n = (await db.execute(select(func.count()).select_from(NovelModel))).scalar() or 0
+        total_ch = (await db.execute(sa_text("SELECT COUNT(*) FROM chapters"))).scalar() or 0
+        total_words = (await db.execute(sa_text("SELECT COALESCE(SUM(word_count),0) FROM chapters"))).scalar() or 0
+        gz = glob.glob("data/content/**/*.gz", recursive=True)
+        try: r = subprocess.run(['pgrep','-f','queue_runner'], capture_output=True, text=True); qp = r.stdout.strip() if r.returncode==0 else None
+        except: qp = None
+        return json.dumps({"tasks":{"total":total_t,"pending":pending_t,"completed":completed_t,"failed":failed_t},"novels":total_n,"chapters":total_ch,"words":total_words,"content_files":len(gz),"queue_running":_queue_running,"queue_pid":qp,"progress":round(completed_t/max(total_t,1)*100,1)})
+
+    result = await get_or_compute("query", "system_stats", ttl=10, compute=_compute)
+    return json.loads(result) if isinstance(result, str) else result
+
+
+@router.get("/tasks/queue-status", status_code=200)
+async def queue_status():
+    """Check if the task queue is currently running."""
+    global _queue_running
+    from app.database import async_session_factory as asf
+    async with asf() as s:
+        pending = (await s.execute(select(func.count()).where(CrawlerTaskModel.status == "pending"))).scalar()
+    return {"running": _queue_running, "pending": pending or 0}
+
+
 @router.get("/tasks/{task_id}", response_model=CrawlerTaskRead)
 async def get_task(
     task_id: str,
@@ -440,16 +726,99 @@ async def update_task(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Edit a crawler task — allows changing any field."""
+    """Edit a crawler task — allows changing novel_id, source_url, etc."""
     task = await crawler_service.get_crawler_task(db, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     for key in ("error_message", "novel_id", "status"):
         if key in data:
             setattr(task, key, data[key])
+    # Also update the novel's source_url if provided
+    from app.models.novel import Novel as NovelModel
+    from sqlalchemy import select as sa_select
+    if "source_url" in data and data["source_url"]:
+        novel = (await db.execute(
+            select(NovelModel).where(NovelModel.id == task.novel_id)
+        )).scalars().first()
+        if novel:
+            novel.source_url = data["source_url"]
+            if "source_name" in data:
+                novel.source_name = data["source_name"]
     await db.flush()
     await db.refresh(task)
     return task
+
+
+@router.post("/tasks/batch-start", status_code=200)
+async def batch_start_tasks(
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Batch start selected pending tasks — runs them sequentially one by one."""
+    ids = data.get("ids", [])
+    started = 0; failed = 0
+    for tid in ids:
+        task = await crawler_service.get_crawler_task(db, tid)
+        if not task or task.status == "running":
+            failed += 1; continue
+        try:
+            await crawler_service.run_crawl(db, tid, mode="direct")
+            started += 1
+        except Exception:
+            failed += 1
+    return {"started": started, "failed": failed}
+
+
+# Global queue state
+_queue_running = False
+
+@router.post("/tasks/queue-start", status_code=200)
+async def queue_start_tasks(
+    current_user: User = Depends(get_current_user),
+):
+    """Start ALL pending tasks in sequence, one after another.
+
+    Runs in the background — returns immediately with the count of queued tasks.
+    Each task completes before the next one starts.
+    """
+    global _queue_running
+    if _queue_running:
+        return {"message": "队列已在运行中", "queued": 0}
+
+    _queue_running = True
+
+    async def _process_queue():
+        global _queue_running
+        try:
+            async with async_session_factory() as db:
+                while True:
+                    tasks_result = await db.execute(
+                        select(CrawlerTaskModel).where(CrawlerTaskModel.status == "pending")
+                        .order_by(CrawlerTaskModel.created_at).limit(1)
+                    )
+                    task = tasks_result.scalars().first()
+                    if not task:
+                        break
+                    try:
+                        await crawler_service.run_crawl(db, str(task.id), mode="direct")
+                    except Exception:
+                        pass
+        finally:
+            _queue_running = False
+
+    # Count pending
+    count_result = await db.execute(
+        select(func.count()).select_from(
+            select(CrawlerTaskModel).where(CrawlerTaskModel.status == "pending").subquery()
+        )
+    ) if False else None
+    # Quick count
+    from app.database import async_session_factory as asf
+    async with asf() as s:
+        c = (await s.execute(select(func.count()).where(CrawlerTaskModel.status == "pending"))).scalar()
+    asyncio.create_task(_process_queue())
+    return {"message": f"队列已启动: {c} 个任务排队中", "queued": c}
 
 
 @router.post("/tasks/{task_id}/start", response_model=CrawlerTaskRead, status_code=202)
@@ -495,7 +864,6 @@ async def retry_task(
     return task
 
 
-@router.post("/tasks/batch-delete", status_code=200)
 async def batch_delete_tasks(
     data: dict,
     db: AsyncSession = Depends(get_db),

@@ -15,11 +15,10 @@ from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-import asyncio
 
-from bs4 import BeautifulSoup
 
-from app.crawlers.anti_detect import smart_fetch
+from app.crawlers.anti_detect import SmartClient
+from app.crawlers.content_cleaner import clean_chapter_title, clean_novel_title
 from app.crawlers.rule_engine import load_rule
 
 
@@ -34,14 +33,25 @@ def _extract_generic(
 ) -> list[dict]:
     """Extract novel links from any HTML page using a URL pattern.
 
-    Looks for all ``<a href>`` that match *novel_url_pattern* and
-    deduplicates by URL.
+    Prioritises links inside ``#main`` (page-specific content), then
+    falls back to whole-page scan.  This avoids picking up the same
+    "hot list" links that appear in the header on every page.
     """
     soup = BeautifulSoup(html, "lxml")
     seen: set[str] = set()
     results: list[dict] = []
 
-    for a_tag in soup.select(f"a[href*='/book/']"):
+    # First: extract from #main (page-specific content)
+    main = soup.select_one("#main")
+    link_source = main if main else soup
+    # Also exclude hot-list and category nav in header
+    for junk in soup.select(".ac_hot, #search-content .search-tag, .header-content .nav-menu-item a"):
+        pass  # we skip these below by checking parent
+
+    for a_tag in link_source.select(f"a[href*='/book/']"):
+        # Skip header navigation links
+        if a_tag.find_parent(class_=["header-content", "nav-menu-items", "ac_hot", "search-tag"]):
+            continue
         href = a_tag.get("href", "").strip()
         if not href or href.startswith("#") or href.startswith("javascript"):
             continue
@@ -55,12 +65,28 @@ def _extract_generic(
         m = re.search(novel_url_pattern, href)
         book_id = m.group(1) if m else ""
 
-        # Try to get title from the link text, title attr, or nearby elements
+        # Try to get title from multiple sources
         title = (
             a_tag.get("title", "")
             or a_tag.get_text(strip=True)
             or ""
         )
+        # If inside a card/list item, look for adjacent title elements
+        if not title or len(title) < 3:
+            parent = a_tag.parent
+            for _ in range(3):
+                if parent is None:
+                    break
+                for sel in [".module-item-title", ".novel-item-title", "h3", "h4", "strong"]:
+                    title_el = parent.select_one(sel)
+                    if title_el:
+                        txt = title_el.get_text(strip=True)
+                        if txt and len(txt) > 2:
+                            title = txt
+                            break
+                if title and len(title) > 2:
+                    break
+                parent = parent.parent
 
         # Skip links that look like category/tag navigation
         if not book_id:
@@ -76,6 +102,15 @@ def _extract_generic(
         if re.search(r"/book/lastupdate|/tag/|/author/|/login|/search|/catalog$|\.html$", href) and not href.endswith(".html"):
             # Allow .html chapter URLs
             pass
+
+        # Clean title if it's a chapter link
+        is_chapter = bool(re.search(r"/\d+\.html$", full_url))
+        if is_chapter:
+            title = clean_chapter_title(title)
+            if not title:
+                title = f"Chapter-{book_id}"  # will be fixed later by repair
+        else:
+            title = clean_novel_title(title)
 
         # Heuristic: skip links with very short text (usually images)
         if not title and not a_tag.find("img"):
@@ -142,8 +177,9 @@ def _extract_with_rule(
                 full_url = urljoin(base_url, href)
                 book_id_match = re.search(r"/book/(\d+)", full_url)
                 book_id = book_id_match.group(1) if book_id_match else ""
+                ch_title = clean_chapter_title(title) if title else ""
                 results.append({
-                    "title": title[:120] or f"Chapter-{book_id}",
+                    "title": ch_title[:120] if ch_title else f"Chapter-{book_id}",
                     "url": full_url,
                     "book_id": book_id,
                     "is_chapter": True,
@@ -247,26 +283,25 @@ async def extract_page_links(
     all_items: list[dict] = []
     pages_fetched = 0
 
-    for pg in range(page_from, page_to + 1):
-        url = _url_for_page(template, pg)
-        try:
-            html = await smart_fetch(url)
-            pages_fetched += 1
-        except Exception:
-            continue  # skip failed pages
+    async with SmartClient(min_delay=0, max_delay=0.5) as client:
+        for pg in range(page_from, page_to + 1):
+            url = _url_for_page(template, pg)
+            try:
+                html = await client.get(url)
+                pages_fetched += 1
+            except Exception:
+                continue
 
-        if rule:
-            items = _extract_with_rule(html, base_url, rule)
-            if not items:
+            if rule:
+                items = _extract_with_rule(html, base_url, rule)
+                if not items:
+                    items = _extract_generic(html, base_url, pattern)
+            else:
                 items = _extract_generic(html, base_url, pattern)
-        else:
-            items = _extract_generic(html, base_url, pattern)
 
-        all_items.extend(items)
-
-        # Early exit: if a page returns no items, stop pagination
-        if not items and pg > page_from:
-            break
+            all_items.extend(items)
+            if not items and pg > page_from:
+                break
 
     # Separate novels vs chapters + deduplicate
     novels: list[dict] = []
@@ -325,7 +360,8 @@ async def test_novel_extraction(
         bid = book_id.group(1)
 
         catalog_url = f"{base_url}/book/{bid}/catalog"
-        html = await smart_fetch(catalog_url)
+        async with SmartClient(min_delay=0, max_delay=0) as c:
+            html = await c.get(catalog_url)
         soup = BeautifulSoup(html, "lxml")
 
         chapter_items = soup.select(".module-row-info a.module-row-text")
@@ -346,7 +382,8 @@ async def test_novel_extraction(
         chapter_url = urljoin(base_url, href)
         title = first.get("title", "") or first.get_text(strip=True)
 
-        ch_html = await smart_fetch(chapter_url)
+        async with SmartClient(min_delay=0, max_delay=0) as c:
+            ch_html = await c.get(chapter_url)
         ch_soup = BeautifulSoup(ch_html, "lxml")
 
         content_div = (

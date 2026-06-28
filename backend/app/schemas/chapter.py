@@ -56,7 +56,7 @@ class ChapterBatchCreate(BaseModel):
 class ChapterBatchDelete(BaseModel):
     """Schema for batch-deleting chapters."""
 
-    ids: list[str] = Field(min_length=1)
+    ids: list[str] = Field(min_length=1, max_length=500)
 
 
 class ChapterReorder(BaseModel):
@@ -64,5 +64,6 @@ class ChapterReorder(BaseModel):
 
     orders: list[dict[str, int]] = Field(
         min_length=1,
+        max_length=500,
         description='List of {"id": "chapter-uuid", "sort_order": 0} objects',
     )

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -14,8 +14,8 @@ router = APIRouter()
 
 @router.get("", response_model=NovelList)
 async def list_novels(
-    page: int = 1,
-    size: int = 20,
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
     category_id: Optional[int] = None,
     status: Optional[str] = None,
@@ -90,11 +90,26 @@ async def upload_cover(
     current_user: User = Depends(get_current_user),
 ):
     """Upload a cover image for a novel."""
+    _ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    _MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+
+    if file.content_type and file.content_type not in _ALLOWED_MIME:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported image type: {file.content_type}. Allowed: {', '.join(sorted(_ALLOWED_MIME))}"
+        )
+
     novel = await novel_service.get_novel(db, novel_id)
     if not novel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found")
 
     content = await file.read()
+    if len(content) > _MAX_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cover image too large ({len(content)} bytes). Max: {_MAX_SIZE} bytes"
+        )
+
     url = await novel_service.save_cover_image(novel, content, file.filename or "cover.jpg")
     novel.cover_image_url = url
     await db.flush()

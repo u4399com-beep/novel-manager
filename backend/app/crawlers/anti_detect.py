@@ -293,16 +293,3 @@ class SmartClient(AntiDetectClient):
 # ---------------------------------------------------------------------------
 # Global convenience (for page_extractor / rule_engine)
 # ---------------------------------------------------------------------------
-_smart_client: Optional[AntiDetectClient] = None
-
-async def smart_fetch(url: str, **kwargs) -> str:
-    global _smart_client
-    if _smart_client is None:
-        _smart_client = AntiDetectClient(min_delay=0.3, max_delay=1.0)
-        _smart_client._clients["default"] = httpx.AsyncClient(timeout=60, follow_redirects=True)
-    c = _smart_client._clients.get("default")
-    if c:
-        resp = await c.get(url) if not kwargs else await c.get(url, headers=kwargs.get("headers", {}))
-        resp.raise_for_status()
-        return resp.text
-    return await _smart_client.get(url)

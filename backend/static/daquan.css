@@ -1,0 +1,29 @@
+/* 小说大全 — 暗金风格 */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei",sans-serif;background:#faf8f5;color:#333;font-size:14px}
+a{color:#333;text-decoration:none}a:hover{color:#c8a34e}
+.wrap{width:1080px;margin:0 auto}
+.header{background:#2c2416;padding:15px 0;border-bottom:3px solid #c8a34e}
+.header .wrap{display:flex;justify-content:space-between;align-items:center}
+.logo a{font-size:24px;font-weight:700;color:#c8a34e}
+.search input{border:1px solid #555;padding:5px 10px;width:200px;background:#1a1510;color:#ccc;border-radius:3px 0 0 3px}
+.search button{background:#c8a34e;color:#2c2416;border:none;padding:5px 14px;border-radius:0 3px 3px 0;cursor:pointer;font-weight:700}
+.nav{background:#3d3220;padding:0}
+.nav .wrap{display:flex}
+.nav a{display:block;padding:10px 16px;color:#c8a34e;font-size:14px}
+.nav a:hover{background:#4d3f28;color:#fff}
+.main{padding:15px 0;display:flex;gap:15px}
+.content{flex:1;min-width:0}
+.sidebar{width:250px}
+.novel-list{background:#fff;border:1px solid #e8dcc8;margin-bottom:12px}
+.novel-list h2{padding:10px 15px;background:#fdf8f0;border-bottom:1px solid #e8dcc8;font-size:16px;color:#6b5a3e}
+.novel-item{display:flex;padding:12px;border-bottom:1px solid #f8f0e0;gap:12px}
+.side-card{background:#fff;border:1px solid #e8dcc8;margin-bottom:10px}
+.side-card h3{padding:8px 12px;background:#fdf8f0;border-bottom:1px solid #e8dcc8;font-size:14px;color:#6b5a3e}
+.chapter-content{font-size:18px;line-height:2;padding:20px}
+.chapter-content p{text-indent:2em;margin-bottom:1em}
+.catalog-grid{display:grid;grid-template-columns:repeat(4,1fr)}
+.catalog-grid a{padding:8px 12px;font-size:13px;border-bottom:1px solid #f8f0e0}
+.pager{text-align:center;padding:15px}.pager a,.pager span{padding:5px 12px;margin:0 3px;border:1px solid #ddd;border-radius:3px}
+.pager .current{background:#c8a34e;color:#2c2416}
+.footer{text-align:center;padding:20px 0;color:#999;font-size:12px;background:#2c2416;color:#8c7a5e;margin-top:20px}

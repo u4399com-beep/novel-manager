@@ -5,25 +5,246 @@
 {% block structured_data %}<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"{{ chapter.title }}","author":{"@type":"Person","name":"{{ novel.author }}"},"isPartOf":{"@type":"Book","name":"{{ novel.title }}","url":"{{ request.url_root }}novel/{{ novel.id }}"}}</script>{% endblock %}
 
 {% block breadcrumb %}
-<div class="breadcrumb"><div class="content"><a href="/">首页</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; <strong>{{ chapter.title }}</strong></div></div>
+<div class="breadcrumb"><div class="content"><a href="/">{{ T('breadcrumb_home') }}</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; <strong>{{ chapter.title }}</strong></div></div>
 {% endblock %}
 
 {% block content %}
 <div class="box view-heading">
-  <div class="chepnav">当前位置：<a href="/">首页</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; {{ chapter.title }}</div>
+  <div class="chepnav">{{ T('current_position') }}：<a href="/">{{ T('breadcrumb_home') }}</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; {{ chapter.title }}</div>
   <h1 class="article-title">{{ chapter.title }}</h1>
   <div class="article-info">{{ novel.author }} · {{ chapter.word_count }}字 · {{ chapter.updated_at.strftime('%Y-%m-%d') if chapter.updated_at else '' }}</div>
 
-  <div class="article-content">
-    {% if chapter.content %}
-    {% for para in chapter.content.split('\n\n') %}{% set t=para.strip() %}{% if t and t|length>3 %}<p>{{ t }}</p>{% endif %}{% endfor %}
-    {% else %}<p class="empty">暂无内容</p>{% endif %}
+  <!-- Random 5 Book Recommendations -->
+  {% if rand_novels and modules.random_recommend %}
+  <div class="rand-recommend">
+    <div class="rand-recommend-title">📚 {{ T('random_recommend') }}</div>
+    <div class="rand-recommend-grid">
+      {% for rn in rand_novels %}
+      <a href="/novel/{{ rn.id }}" class="rand-book-card" title="{{ rn.title }}{% if rn.author %} — {{ rn.author }}{% endif %}">
+        <div class="rand-book-cover">
+          <img src="{{ rn.cover_image_url }}" alt="{{ rn.title }}" loading="lazy">
+        </div>
+        <div class="rand-book-info">
+          <div class="rand-book-title">{{ rn.title }}</div>
+          <div class="rand-book-chapter">
+            {% if rn.latest_title %}
+            {{ rn.latest_title[:20] }}
+            {% else %}
+            {{ rn.total_chapters }}章
+            {% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Reader Toolbar -->
+  <div class="reader-toolbar" id="readerToolbar" style="top:0">
+    <select id="fontFamily" title="{{ T('font_family') }}">
+      <option value="">{{ T('font_default') }}</option>
+      <option value="'PingFang SC', 'Microsoft YaHei', sans-serif">{{ T('font_hei') }}</option>
+      <option value="'Noto Serif SC', 'SimSun', 'STSong', serif">{{ T('font_song') }}</option>
+      <option value="'KaiTi', 'STKaiti', '楷体', serif">{{ T('font_kai') }}</option>
+      <option value="'Georgia', 'Times New Roman', serif">{{ T('font_serif') }}</option>
+    </select>
+    <button id="fontSizeDown" title="{{ T('font_size_down') }}">A-</button>
+    <span id="fontSizeLabel">18px</span>
+    <button id="fontSizeUp" title="{{ T('font_size_up') }}">A+</button>
+    <span class="sep">|</span>
+    <button class="bg-btn active" data-bg="#fff" style="background:#fff" title="{{ T('bg_white') }}">□</button>
+    <button class="bg-btn" data-bg="#f5f0e8" style="background:#f5f0e8" title="{{ T('bg_warm') }}">□</button>
+    <button class="bg-btn" data-bg="#e8f0e8" style="background:#e8f0e8" title="{{ T('bg_green') }}">□</button>
+    <button class="bg-btn" data-bg="#1a1a2e" style="background:#1a1a2e;color:#ccc" title="{{ T('bg_dark') }}">□</button>
+    <span class="sep">|</span>
+    <span class="hint">{{ T('space_hint') }}</span>
+    <button class="fullscreen-btn" onclick="document.documentElement.requestFullscreen()" title="{{ T('fullscreen') }}">⛶</button>
   </div>
 
+  <div class="article-content" id="articleContent">
+    {% if chapter.content %}
+    {% for para in chapter.content.split('\n\n') %}{% set t=para.strip() %}{% if t and t|length>3 %}<p>{{ t }}</p>{% endif %}{% endfor %}
+    {% else %}<p class="empty">{{ T('no_description') }}</p>{% endif %}
+  </div>
+
+  <!-- Page Navigation (content pagination) -->
+  {% if has_pagination %}
+  <div class="page-nav">
+    <div class="page-nav-label">{{ T('pagination_label') }}：</div>
+    <div class="page-nav-links">
+      {% for p in range(1, total_pages + 1) %}
+        {% if p == current_page %}
+        <span class="page-nav-current">{{ p }}</span>
+        {% else %}
+        <a href="{{ page_urls[p] }}" class="page-nav-link">{{ p }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <div class="chapter-pager">
-    {% if prev_id %}<a href="/chapter/{{ prev_id }}">← 上一章</a>{% else %}<span class="disabled">← 上一章</span>{% endif %}
-    <a href="/novel/{{ novel.id }}/chapters">📋 目录</a>
-    {% if next_id %}<a href="/chapter/{{ next_id }}">下一章 →</a>{% else %}<span class="disabled">下一章 →</span>{% endif %}
+    {% if prev_id %}<a href="/chapter/{{ prev_id }}">← {{ T('prev_chapter') }}</a>{% else %}<span class="disabled">← {{ T('prev_chapter') }}</span>{% endif %}
+    <a href="/novel/{{ novel.id }}/chapters">📋 {{ T('catalog') }}</a>
+    {% if next_id %}<a href="/chapter/{{ next_id }}">{{ T('next_chapter') }} →</a>{% else %}<span class="disabled">{{ T('next_chapter') }} →</span>{% endif %}
   </div>
 </div>
+
+<script>
+(function(){
+  var box = document.querySelector('.view-heading');
+  var content = document.getElementById('articleContent');
+  var toolbar = document.getElementById('readerToolbar');
+  var randRec = document.querySelector('.rand-recommend');
+
+  // ---- Font family ----
+  document.getElementById('fontFamily').addEventListener('change', function(e){
+    content.style.fontFamily = e.target.value;
+    if (randRec) randRec.style.fontFamily = e.target.value;
+    localStorage.setItem('reader_font', e.target.value);
+  });
+
+  // ---- Font size ----
+  var size = parseInt(localStorage.getItem('reader_size')) || 18;
+  function applySize(s){
+    size = Math.max(12, Math.min(32, s));
+    content.style.fontSize = size + 'px';
+    document.getElementById('fontSizeLabel').textContent = size + 'px';
+    localStorage.setItem('reader_size', size);
+    // Sync to random recommend section (scale proportionally)
+    if (randRec) {
+      var recSize = Math.max(11, size - 6);
+      randRec.style.fontSize = recSize + 'px';
+    }
+  }
+  document.getElementById('fontSizeUp').onclick = function(){ applySize(size + 2); };
+  document.getElementById('fontSizeDown').onclick = function(){ applySize(size - 2); };
+
+  // ---- Background ----
+  var bgBtns = document.querySelectorAll('.bg-btn');
+  function setBg(color){
+    box.style.backgroundColor = color;
+    bgBtns.forEach(function(b){ b.classList.toggle('active', b.dataset.bg === color); });
+    localStorage.setItem('reader_bg', color);
+    var isDark = color === '#1a1a2e';
+    content.style.color = isDark ? '#ccc' : '';
+    document.body.style.background = isDark ? '#111' : '';
+    // Sync to random recommend section
+    if (randRec) {
+      if (isDark) {
+        randRec.style.background = '#222438';
+        randRec.style.borderColor = '#333';
+        var titles = randRec.querySelectorAll('.rand-book-title');
+        var chapters = randRec.querySelectorAll('.rand-book-chapter');
+        titles.forEach(function(el){ el.style.color = '#ccc'; });
+        chapters.forEach(function(el){ el.style.color = '#888'; });
+      } else if (color === '#e8f0e8') {
+        randRec.style.background = '#e8f0e0';
+        randRec.style.borderColor = '#c8d8c0';
+        resetRecColors();
+      } else if (color === '#f5f0e8') {
+        randRec.style.background = '#f5efe0';
+        randRec.style.borderColor = '#e0d8c8';
+        resetRecColors();
+      } else {
+        randRec.style.background = '#fafbfc';
+        randRec.style.borderColor = '#ebeef5';
+        resetRecColors();
+      }
+    }
+  }
+  function resetRecColors(){
+    var titles = randRec.querySelectorAll('.rand-book-title');
+    var chapters = randRec.querySelectorAll('.rand-book-chapter');
+    titles.forEach(function(el){ el.style.color = ''; });
+    chapters.forEach(function(el){ el.style.color = ''; });
+  }
+  bgBtns.forEach(function(b){
+    b.onclick = function(){ setBg(b.dataset.bg); };
+  });
+
+  // ---- Keyboard ----
+  var prevUrl = '{% if prev_id %}/chapter/{{ prev_id }}{% endif %}';
+  var nextUrl = '{% if next_id %}/chapter/{{ next_id }}{% endif %}';
+  document.addEventListener('keydown', function(e){
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.key === ' ' || e.code === 'Space'){
+      e.preventDefault();
+      window.scrollBy({top: window.innerHeight * 0.9, behavior: 'smooth'});
+    } else if (e.key === 'ArrowRight' && nextUrl){
+      window.location.href = nextUrl;
+    } else if (e.key === 'ArrowLeft' && prevUrl){
+      window.location.href = prevUrl;
+    }
+  });
+
+  // ---- Restore preferences ----
+  var savedFont = localStorage.getItem('reader_font');
+  if (savedFont){ document.getElementById('fontFamily').value = savedFont; content.style.fontFamily = savedFont; if (randRec) randRec.style.fontFamily = savedFont; }
+  applySize(size);
+  var savedBg = localStorage.getItem('reader_bg');
+  if (savedBg) setBg(savedBg);
+
+  // ---- Hide toolbar on scroll ----
+  var lastScroll = 0;
+  window.addEventListener('scroll', function(){
+    var y = window.scrollY;
+    toolbar.style.opacity = y > lastScroll && y > 200 ? '0.3' : '1';
+    lastScroll = y;
+  });
+})();
+</script>
+
+<style>
+.reader-toolbar{
+  display:flex;align-items:center;gap:8px;padding:8px 14px;margin:0 -14px 12px;
+  background:#f8f9f9;border-radius:8px;font-size:13px;position:sticky;top:0;z-index:10;
+  transition:opacity .3s;flex-wrap:wrap;
+}
+.reader-toolbar select{
+  border:1px solid #ddd;border-radius:4px;padding:3px 8px;font-size:13px;background:#fff;
+}
+.reader-toolbar button{
+  border:1px solid #ddd;border-radius:4px;padding:3px 8px;cursor:pointer;background:#fff;font-size:13px;
+}
+.reader-toolbar button:hover{background:#e3e6eb}
+.bg-btn{width:28px;height:22px;border-radius:4px!important;padding:0!important}
+.bg-btn.active{border-color:#ff2a14;box-shadow:0 0 0 2px #ff2a14}
+.sep{color:#ddd}.hint{color:#999;font-size:12px}.fullscreen-btn{font-size:16px;margin-left:auto}
+.page-nav{display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 0;margin:16px 0 0;border-top:1px solid #ebeef5;flex-wrap:wrap}
+.page-nav-label{font-size:13px;color:#909399}
+.page-nav-links{display:flex;gap:4px;flex-wrap:wrap}
+.page-nav-link,.page-nav-current{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border-radius:4px;font-size:13px;text-decoration:none;border:1px solid #e3e6eb;color:#606266;transition:all .15s}
+.page-nav-link:hover{background:#ff2a14;color:#fff;border-color:#ff2a14}
+.page-nav-current{background:#ff2a14;color:#fff;border-color:#ff2a14;font-weight:600}
+
+/* ---- Random 5 Book Recommendations ---- */
+.rand-recommend{margin:16px 0 8px;padding:10px 12px;background:#fafbfc;border-radius:10px;border:1px solid #ebeef5}
+.rand-recommend-title{font-size:13px;font-weight:600;color:#606266;margin-bottom:8px}
+.rand-recommend-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.rand-book-card{display:flex;align-items:flex-start;gap:8px;text-decoration:none;color:#303133;transition:transform .15s,box-shadow .15s;border-radius:8px;padding:8px}
+.rand-book-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.08);background:#fff}
+.rand-book-cover{width:54px;height:72px;flex-shrink:0;border-radius:4px;overflow:hidden;background:#f0f1f2;display:flex;align-items:center;justify-content:center}
+.rand-book-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.rand-cover-placeholder{font-size:1.4rem;color:#c0c4cc}
+.rand-book-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:3px}
+.rand-book-title{font-size:13px;font-weight:500;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all}
+.rand-book-chapter{font-size:11px;color:#909399;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media(max-width:768px){
+  .rand-recommend-grid{grid-template-columns:repeat(5,1fr);gap:4px}
+  .rand-book-card{padding:6px;gap:6px}
+  .rand-book-cover{width:44px;height:58px}
+  .rand-book-title{font-size:11px}
+  .rand-book-chapter{font-size:10px}
+}
+@media(max-width:480px){
+  .rand-recommend-grid{grid-template-columns:repeat(2,1fr);gap:6px}
+  .rand-book-card{flex-direction:row;padding:6px}
+  .rand-book-cover{width:40px;height:53px;border-radius:3px}
+  .rand-book-title{font-size:12px;-webkit-line-clamp:1}
+  .rand-book-chapter{font-size:10px}
+}
+</style>
 {% endblock %}

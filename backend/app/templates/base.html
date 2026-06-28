@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>{% block title %}首页{% endblock %} - 铅笔小说</title>
+<title>{% block title %}{{ T('home') }}{% endblock %} - {{ site.name if site else T('site_name') }}</title>
 <meta name="description" content="{% block description %}免费在线小说阅读，海量精品网络小说资源{% endblock %}">
 <meta name="keywords" content="{% block keywords %}小说,网络小说,免费小说,在线阅读{% endblock %}">
 <meta name="robots" content="index,follow">
@@ -19,10 +19,10 @@
 <body>
 <header id="header" class="wrapper">
   <div class="header-content">
-    <div class="header-logo"><a href="/" class="logo">📚 铅笔小说</a></div>
+    <div class="header-logo"><a href="/" class="logo">📚 {{ site.name if site else T('site_name') }}</a></div>
     <nav class="nav">
       <ul class="nav-menu-items">
-        <li class="nav-menu-item{% if request.url.path=='/' %} selected{% endif %}"><a href="/">首页</a></li>
+        <li class="nav-menu-item{% if request.url.path=='/' %} selected{% endif %}"><a href="/">{{ T('home') }}</a></li>
         {% for cat in (categories or [])[:12] %}
         <li class="nav-menu-item"><a href="/novels?category={{ cat.id }}">{{ cat.name }}</a></li>
         {% endfor %}
@@ -31,8 +31,8 @@
     <div class="header-module">
       <form action="/search" method="get" class="nav-search">
         <div class="search-box">
-          <input class="search-input" type="search" name="q" placeholder="搜索小说、作者" value="{{ query or '' }}" autocomplete="off">
-          <button class="search-btn" type="submit">搜索</button>
+          <input class="search-input" type="search" name="q" placeholder="{{ T('search_placeholder') }}" value="{{ query or '' }}" autocomplete="off">
+          <button class="search-btn" type="submit">{{ T('search_btn') }}</button>
         </div>
       </form>
     </div>
@@ -47,5 +47,7 @@
 <footer id="footer" class="wrapper">
   <div class="content"><p>&copy; 2026 铅笔小说 · 本站内容来源于网络采集</p></div>
 </footer>
+<script>window.addEventListener('scroll',function(){document.getElementById('header').classList.toggle('scrolled',window.scrollY>10)});</script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

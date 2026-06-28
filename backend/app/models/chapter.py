@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import Index, Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -42,6 +42,12 @@ class Chapter(Base, TimestampMixin):
 
     # Relationships
     novel = relationship("Novel", back_populates="chapters")
+
+    __table_args__ = (
+        Index("ix_chapters_novel_sort", "novel_id", "sort_order"),
+        Index("ix_chapters_novel_source_url", "novel_id", "source_url"),
+        Index("ix_chapters_novel_published", "novel_id", "is_published"),
+    )
 
     def __repr__(self) -> str:
         return f"<Chapter {self.title}>"

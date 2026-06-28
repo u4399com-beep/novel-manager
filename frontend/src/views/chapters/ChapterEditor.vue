@@ -62,7 +62,7 @@ const isNew = computed(() => chapterId === 'new')
 const formRef = ref()
 const loading = ref(false)
 const submitting = ref(false)
-const chapter = ref<any>(null)
+const chapter = ref<import('@/api/chapters').ChapterDetail | null>(null)
 
 const form = reactive({
   title: '',

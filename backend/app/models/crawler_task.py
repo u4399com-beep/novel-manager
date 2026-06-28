@@ -2,7 +2,7 @@ from typing import Optional
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -32,6 +32,11 @@ class CrawlerTask(Base, TimestampMixin):
     )
     finished_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_crawler_tasks_status_created", "status", "created_at"),
+        Index("ix_crawler_tasks_novel_status", "novel_id", "status"),
     )
 
     def __repr__(self) -> str:

@@ -13,11 +13,22 @@ router = APIRouter()
 
 @router.get("", response_model=list[CategoryRead])
 async def list_categories(db: AsyncSession = Depends(get_db)):
-    """List all categories, ordered by sort_order."""
-    result = await db.execute(
-        select(Category).order_by(Category.sort_order.asc())
-    )
-    return result.scalars().all()
+    """List all categories, ordered by sort_order (cached 5 min)."""
+    from app.services.redis_cache import get_or_compute
+
+    async def _fetch():
+        result = await db.execute(
+            select(Category).order_by(Category.sort_order.asc())
+        )
+        return result.scalars().all()
+
+    return await get_or_compute("query", "categories_api", ttl=300, compute=_fetch)
+
+
+async def _invalidate_category_cache():
+    """Invalidate cached category queries after mutation."""
+    from app.services.redis_cache import delete_pattern
+    await delete_pattern("query", "*categories*")
 
 
 @router.post("", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
@@ -31,6 +42,7 @@ async def create_category(
     db.add(category)
     await db.flush()
     await db.refresh(category)
+    await _invalidate_category_cache()
     return category
 
 
@@ -63,6 +75,7 @@ async def update_category(
 
     await db.flush()
     await db.refresh(category)
+    await _invalidate_category_cache()
     return category
 
 
@@ -80,3 +93,4 @@ async def delete_category(
 
     await db.delete(category)
     await db.flush()
+    await _invalidate_category_cache()

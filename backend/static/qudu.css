@@ -1,0 +1,29 @@
+/* 趣读小说 — 紫色风格 */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei",sans-serif;background:#f5f0fa;color:#333;font-size:14px}
+a{color:#333;text-decoration:none}a:hover{color:#7b2d8e}
+.wrap{width:1100px;margin:0 auto}
+.header{background:linear-gradient(135deg,#5b1a6e,#7b2d8e);padding:18px 0}
+.header .wrap{display:flex;justify-content:space-between;align-items:center}
+.logo a{font-size:26px;font-weight:700;color:#fff}
+.search input{border:none;padding:6px 12px;width:220px;border-radius:20px 0 0 20px;outline:none}
+.search button{background:#9b59b6;color:#fff;border:none;padding:6px 18px;border-radius:0 20px 20px 0;cursor:pointer}
+.nav{background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.06)}
+.nav .wrap{display:flex}
+.nav a{display:block;padding:12px 18px;color:#555;font-size:14px}
+.nav a:hover{color:#7b2d8e;border-bottom:2px solid #7b2d8e}
+.main{padding:15px 0;display:flex;gap:20px}
+.content{flex:1;min-width:0}
+.sidebar{width:260px}
+.novel-list{background:#fff;border-radius:8px;padding:15px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.novel-list h2{font-size:16px;color:#5b1a6e;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #7b2d8e}
+.novel-item{display:flex;padding:10px 0;border-bottom:1px solid #f5f0fa;gap:12px}
+.side-card{background:#fff;border-radius:8px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.side-card h3{font-size:14px;color:#5b1a6e;margin-bottom:8px}
+.chapter-content{font-size:18px;line-height:2;padding:20px}
+.chapter-content p{text-indent:2em;margin-bottom:1em}
+.catalog-grid{display:grid;grid-template-columns:repeat(4,1fr)}
+.catalog-grid a{padding:8px 12px;font-size:13px;border-bottom:1px solid #f5f0fa}
+.pager{text-align:center;padding:15px}.pager a,.pager span{padding:5px 12px;margin:0 3px;border:1px solid #ddd;border-radius:20px}
+.pager .current{background:#7b2d8e;color:#fff}
+.footer{text-align:center;padding:20px 0;color:#999;font-size:12px;background:#5b1a6e;color:#cba3d8;margin-top:20px}

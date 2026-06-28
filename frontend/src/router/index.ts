@@ -64,6 +64,16 @@ const routes: RouteRecordRaw[] = [
         name: 'RuleEditor',
         component: () => import('@/views/rules/RuleEditor.vue'),
       },
+      {
+        path: 'sites',
+        name: 'SiteList',
+        component: () => import('@/views/sites/SiteList.vue'),
+      },
+      {
+        path: 'link-rings',
+        name: 'LinkRingList',
+        component: () => import('@/views/sites/LinkRingList.vue'),
+      },
     ],
   },
 ]

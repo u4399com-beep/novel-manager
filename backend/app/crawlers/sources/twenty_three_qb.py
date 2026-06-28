@@ -22,6 +22,7 @@ from bs4 import BeautifulSoup, Tag
 
 from app.config import settings
 from app.crawlers.base import BaseCrawler
+from app.crawlers.content_cleaner import clean_chapter_title
 from app.crawlers.registry import register_crawler
 
 # ---------------------------------------------------------------------------
@@ -150,9 +151,6 @@ class TwentyThreeQbCrawler(BaseCrawler):
 
         Returns a list of dicts with keys:
             title, author, url, book_id, cover_url, description
-
-        Search result items use ``.module-search-item`` (different from
-        the homepage ``.module-item`` structure).
         """
         search_url = f"{self.base_url}/search.html?searchkey={keyword}"
         html = await self._fetch(search_url)
@@ -161,28 +159,22 @@ class TwentyThreeQbCrawler(BaseCrawler):
         results: list[dict] = []
 
         for item in soup.select(".module-search-item"):
-            # All <a> tags inside the item: [cover_link, category_link, title_link, ...]
             links = item.select("a")
             if len(links) < 3:
                 continue
 
-            title_link = links[2]  # third <a> is the book title
+            title_link = links[2]
             href = urljoin(self.base_url, title_link.get("href", ""))
             title = _clean_text(title_link.get_text()) or ""
 
-            # Author is embedded in the full text of the item
             full_text = item.get_text(" ", strip=True)
-            # Pattern: "...书名.作者名.其他..." or we fall back to extracting
             author = ""
             parts = full_text.split(".")
             if len(parts) >= 3:
-                # parts[0] = category, parts[1] = title, parts[2] = author
                 author = parts[2].strip()
 
-            # Description = remaining text after the title link
             desc_parts = full_text.split(title, 1)
             description = desc_parts[1].strip() if len(desc_parts) > 1 else ""
-            # Remove author from beginning of description
             if author and description.startswith(author):
                 description = description[len(author):].strip(" .")
 
@@ -207,7 +199,6 @@ class TwentyThreeQbCrawler(BaseCrawler):
         html = await self._fetch(novel_url)
         soup = self._soup(html)
 
-        # --- meta-based extraction (most reliable) ---
         title = (
             _meta(soup, "og:novel:book_name")
             or _meta(soup, "og:title")
@@ -224,7 +215,6 @@ class TwentyThreeQbCrawler(BaseCrawler):
         status = STATUS_MAP.get(raw_status, "ongoing")
         tags = _meta(soup, "og:novel:tags") or ""
 
-        # --- fallback: DOM-based extraction ---
         if not title:
             h1 = soup.select_one("h1.page-title")
             title = _clean_text(h1.get_text()) if h1 else ""
@@ -236,13 +226,11 @@ class TwentyThreeQbCrawler(BaseCrawler):
                 if author_text.startswith("作者："):
                     author = author_text[3:]
 
-        # Category name from the nav link
         category_name = ""
-        cat_link = soup.select_one(".novel-info-aux a[title$='小说']")
+        cat_link = soup.select_one(".novel-info-aux a[href*='/book/lastupdate']")
         if cat_link:
-            category_name = cat_link.get("title", "").replace("小说", "")
+            category_name = cat_link.get_text(strip=True)
 
-        # Word count from text like "100.7 万字"
         word_count = 0
         word_span = soup.find("span", class_="tag-link", string=re.compile(r"万字"))
         if word_span:
@@ -250,7 +238,6 @@ class TwentyThreeQbCrawler(BaseCrawler):
             if wm:
                 word_count = int(float(wm.group(1)) * 10000)
 
-        # --- description may contain HTML <br> from meta ---
         description = description.replace("<br />", "\n").replace("<br>", "\n")
 
         return {
@@ -265,16 +252,27 @@ class TwentyThreeQbCrawler(BaseCrawler):
             "book_id": _extract_book_id(novel_url) or "",
         }
 
-    async def get_chapters(self, novel_url: str) -> list[dict]:
-        """Fetch ALL chapters (with content) for a novel.
+    # ------------------------------------------------------------------
+    # Chapter fetching (concurrent)
+    # ------------------------------------------------------------------
 
-        Steps:
-            1. Fetch the catalog page to get the chapter list.
-            2. Fetch each chapter page for content.
-            3. Return a list of {title, content, source_url, sort_order}.
+    _CHAPTER_CONTENT_SELECTORS = [
+        ".view-heading .article-content",
+        "div.article-content",
+    ]
+    _JUNK_SELECTORS = ["script", "ins", ".adsbygoogle"]
 
-        NOTE: For novels with many chapters this is slow (rate-limited).
-        Consider overriding ``max_chapters`` to limit the fetch.
+    async def get_chapters(
+        self, novel_url: str, max_chapters: Optional[int] = None
+    ) -> list[dict]:
+        """Fetch ALL chapters (with content) for a novel — **concurrently**.
+
+        Fetches up to ``CRAWLER_CONCURRENCY`` (default 10) chapter pages
+        in parallel via :class:`asyncio.Semaphore`.
+
+        Returns:
+            list[dict]: Each dict has keys *title*, *content*,
+                        *source_url*, *sort_order* (catalog order).
         """
         book_id = _extract_book_id(novel_url)
         if not book_id:
@@ -284,57 +282,60 @@ class TwentyThreeQbCrawler(BaseCrawler):
         html = await self._fetch(catalog_url)
         soup = self._soup(html)
 
-        # Each chapter row: div.module-row-info > a.module-row-text
         chapter_items = soup.select(".module-row-info a.module-row-text")
-        chapters: list[dict] = []
+        if max_chapters:
+            chapter_items = chapter_items[:max_chapters]
 
-        for idx, a_tag in enumerate(chapter_items):
-            href = a_tag.get("href", "")
-            title = a_tag.get("title", "")
-            if not title:
-                span = a_tag.select_one(".module-row-title span")
-                title = _clean_text(span.get_text()) if span else ""
+        concurrency = getattr(settings, "CRAWLER_CONCURRENCY", 10)
+        sem = asyncio.Semaphore(concurrency)
 
-            chapter_url = urljoin(self.base_url, href)
-            source_url = chapter_url
+        async def _fetch_one(idx: int, a_tag) -> dict:
+            async with sem:
+                href = a_tag.get("href", "")
+                title = a_tag.get("title", "")
+                if not title:
+                    span = a_tag.select_one(".module-row-title span")
+                    title = _clean_text(span.get_text()) if span else ""
 
-            # Fetch content
-            content = ""
-            try:
-                ch_html = await self._fetch(chapter_url)
-                ch_soup = self._soup(ch_html)
+                chapter_url = urljoin(self.base_url, href)
 
-                # Chapter body is in div.article-content inside .view-heading.
-                content_div = (
-                    ch_soup.select_one(".view-heading .article-content")
-                    or ch_soup.select_one("div.article-content")
-                )
-                if content_div:
-                    # Remove ad blocks and scripts
-                    for junk in content_div.select("script, ins, .adsbygoogle"):
-                        junk.decompose()
-                    text = _clean_text(content_div.get_text())
-                    if text:
-                        content = text
-            except Exception:
-                pass  # skip chapters that fail to fetch
+                content = ""
+                try:
+                    ch_html = await self._fetch(chapter_url)
+                    ch_soup = self._soup(ch_html)
+                    content_div = None
+                    for sel in self._CHAPTER_CONTENT_SELECTORS:
+                        content_div = ch_soup.select_one(sel)
+                        if content_div:
+                            break
+                    if content_div:
+                        for junk in content_div.select(", ".join(self._JUNK_SELECTORS)):
+                            junk.decompose()
+                        text = _clean_text(content_div.get_text())
+                        if text:
+                            content = text
+                except Exception:
+                    pass  # skip chapters that fail to fetch
 
-            chapters.append({
-                "title": _clean_text(title) or f"第{idx+1}章",
-                "content": content,
-                "source_url": source_url,
-                "sort_order": idx + 1,
-            })
+                ch_title = clean_chapter_title(_clean_text(title) or "")
+                if not ch_title:
+                    ch_title = f"第{idx+1}章"
+                return {
+                    "title": ch_title,
+                    "content": content,
+                    "source_url": chapter_url,
+                    "sort_order": idx + 1,
+                }
 
-        return chapters
+        results = await asyncio.gather(
+            *[_fetch_one(i, a) for i, a in enumerate(chapter_items)]
+        )
+        return list(results)
 
     async def get_new_chapters(
         self, novel_url: str, last_source_url: Optional[str] = None
     ) -> list[dict]:
-        """Fetch only NEW chapters (since *last_source_url*).
-
-        This is more efficient than ``get_chapters`` for update checks.
-        """
+        """Fetch only NEW chapters (since *last_source_url*) — **concurrently**."""
         book_id = _extract_book_id(novel_url)
         if not book_id:
             raise ValueError(f"Cannot extract book_id from URL: {novel_url}")
@@ -344,48 +345,63 @@ class TwentyThreeQbCrawler(BaseCrawler):
         soup = self._soup(html)
 
         chapter_items = soup.select(".module-row-info a.module-row-text")
-        new_chapters: list[dict] = []
-        found_existing = False
 
-        for idx, a_tag in enumerate(chapter_items):
-            href = a_tag.get("href", "")
-            chapter_url = urljoin(self.base_url, href)
+        # Find cutoff: first already-known chapter
+        cutoff = len(chapter_items)
+        if last_source_url:
+            for i, a_tag in enumerate(chapter_items):
+                href = a_tag.get("href", "")
+                chapter_url = urljoin(self.base_url, href)
+                if chapter_url == last_source_url:
+                    cutoff = i
+                    break
+        new_items = chapter_items[:cutoff]
 
-            if last_source_url and chapter_url == last_source_url:
-                found_existing = True
-                break  # stop at the first already-known chapter
+        concurrency = getattr(settings, "CRAWLER_CONCURRENCY", 10)
+        sem = asyncio.Semaphore(concurrency)
 
-            title = a_tag.get("title", "")
-            if not title:
-                span = a_tag.select_one(".module-row-title span")
-                title = _clean_text(span.get_text()) if span else ""
+        async def _fetch_one(idx: int, a_tag) -> dict:
+            async with sem:
+                href = a_tag.get("href", "")
+                title = a_tag.get("title", "")
+                if not title:
+                    span = a_tag.select_one(".module-row-title span")
+                    title = _clean_text(span.get_text()) if span else ""
 
-            content = ""
-            try:
-                ch_html = await self._fetch(chapter_url)
-                ch_soup = self._soup(ch_html)
-                content_div = (
-                    ch_soup.select_one(".view-heading .article-content")
-                    or ch_soup.select_one("div.article-content")
-                )
-                if content_div:
-                    for junk in content_div.select("script, ins, .adsbygoogle"):
-                        junk.decompose()
-                    text = _clean_text(content_div.get_text())
-                    if text:
-                        content = text
-            except Exception:
-                pass
+                chapter_url = urljoin(self.base_url, href)
 
-            new_chapters.append({
-                "title": _clean_text(title) or f"第{idx+1}章",
-                "content": content,
-                "source_url": chapter_url,
-                "sort_order": idx + 1,
-            })
+                content = ""
+                try:
+                    ch_html = await self._fetch(chapter_url)
+                    ch_soup = self._soup(ch_html)
+                    content_div = None
+                    for sel in self._CHAPTER_CONTENT_SELECTORS:
+                        content_div = ch_soup.select_one(sel)
+                        if content_div:
+                            break
+                    if content_div:
+                        for junk in content_div.select(", ".join(self._JUNK_SELECTORS)):
+                            junk.decompose()
+                        text = _clean_text(content_div.get_text())
+                        if text:
+                            content = text
+                except Exception:
+                    pass
 
-        # Return in chronological order (oldest first)
-        return list(reversed(new_chapters))
+                ch_title = clean_chapter_title(_clean_text(title) or "")
+                if not ch_title:
+                    ch_title = f"第{idx+1}章"
+                return {
+                    "title": ch_title,
+                    "content": content,
+                    "source_url": chapter_url,
+                    "sort_order": idx + 1,
+                }
+
+        results = await asyncio.gather(
+            *[_fetch_one(i, a) for i, a in enumerate(new_items)]
+        )
+        return list(results)
 
     async def get_category_list(
         self, category_id: int, page: int = 1

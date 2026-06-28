@@ -8,3 +8,4 @@ when imported.
 # Import sources to trigger registration
 from app.crawlers.sources import example  # noqa: F401
 from app.crawlers.sources import twenty_three_qb  # noqa: F401
+from app.crawlers.sources import rule_based  # noqa: F401

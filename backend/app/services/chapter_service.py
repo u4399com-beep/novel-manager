@@ -2,12 +2,23 @@ from typing import Optional
 
 import re
 
-from sqlalchemy import func, select, update
+import asyncio
+
+from sqlalchemy import case, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chapter import Chapter
 from app.models.novel import Novel
 from app.services import content_store
+
+
+async def _invalidate_cache(novel_id: str):
+    """Fire-and-forget cache invalidation after chapter mutations."""
+    try:
+        from app.services.write_behind_cache import invalidate_novel
+        await invalidate_novel(novel_id)
+    except Exception:
+        pass
 
 
 def count_words(text: Optional[str]) -> int:
@@ -65,7 +76,7 @@ async def get_chapter(db: AsyncSession, chapter_id: str) -> Optional[Chapter]:
 async def get_chapter_content(chapter: Chapter) -> str:
     """Read chapter content from file store (with cache), falling back to DB."""
     if chapter.content_file:
-        text = content_store.read_content(
+        text = await content_store.aread_content(
             chapter.novel_id, str(chapter.id), chapter.content_file
         )
         if text:
@@ -103,12 +114,13 @@ async def create_chapter(
     await db.flush()
     # Write content to compressed file
     if content:
-        chapter.content_file = content_store.write_content(novel_id, str(chapter.id), content)
+        chapter.content_file = await content_store.awrite_content(novel_id, str(chapter.id), content)
 
-    # Update novel's total_chapters
-    await _recount_novel_chapters(db, novel_id)
+    # Update novel's total_chapters (atomic +1)
+    await _recount_novel_chapters(db, novel_id, delta=1)
 
     await db.refresh(chapter)
+    asyncio.create_task(_invalidate_cache(novel_id))
     return chapter
 
 
@@ -134,13 +146,19 @@ async def delete_chapter(db: AsyncSession, chapter: Chapter) -> None:
     novel_id = chapter.novel_id
     await db.delete(chapter)
     await db.flush()
-    await _recount_novel_chapters(db, novel_id)
+    await _recount_novel_chapters(db, novel_id, delta=-1)
+    asyncio.create_task(_invalidate_cache(novel_id))
 
 
 async def batch_create_chapters(
     db: AsyncSession, novel_id: str, chapters_data: list[dict]
 ) -> list[Chapter]:
-    """Batch create chapters in a single transaction."""
+    """Batch create chapters in a single transaction.
+
+    Chapters with empty or invalid titles are silently skipped.
+    """
+    from app.crawlers.content_cleaner import is_valid_chapter_title
+
     # Get current max sort_order
     max_result = await db.execute(
         select(func.max(Chapter.sort_order)).where(Chapter.novel_id == novel_id)
@@ -149,6 +167,11 @@ async def batch_create_chapters(
 
     chapters = []
     for i, data in enumerate(chapters_data):
+        # Skip chapters with garbage titles
+        raw_title = data.get("title", "")
+        if not is_valid_chapter_title(raw_title):
+            continue
+
         sort_order = data.get("sort_order")
         if sort_order is None:
             sort_order = max_order + i + 1
@@ -156,7 +179,7 @@ async def batch_create_chapters(
         text = data.get("content", "")
         chapter = Chapter(
             novel_id=novel_id,
-            title=data["title"],
+            title=raw_title,
             source_url=data.get("source_url"),
             is_published=data.get("is_published", True),
             sort_order=sort_order,
@@ -168,57 +191,74 @@ async def batch_create_chapters(
         # Flush to get chapter.id, then write content file
         if text:
             await db.flush()
-            chapter.content_file = content_store.write_content(novel_id, str(chapter.id), text)
+            chapter.content_file = await content_store.awrite_content(novel_id, str(chapter.id), text)
 
     await db.flush()
-    await _recount_novel_chapters(db, novel_id)
+    await _recount_novel_chapters(db, novel_id, delta=len(chapters))
 
     for ch in chapters:
         await db.refresh(ch)
+    asyncio.create_task(_invalidate_cache(novel_id))
     return chapters
 
 
 async def reorder_chapters(
     db: AsyncSession, novel_id: str, orders: list[dict[str, int]]
 ) -> None:
-    """Reorder chapters by updating their sort_order values."""
-    for item in orders:
-        chapter_id = item["id"]
-        new_order = item["sort_order"]
-        await db.execute(
-            update(Chapter)
-            .where(Chapter.id == chapter_id, Chapter.novel_id == novel_id)
-            .values(sort_order=new_order)
-        )
+    """Reorder chapters with a single bulk CASE UPDATE."""
+    if not orders:
+        return
+    # Build CASE expression: WHEN id=X THEN Y WHEN id=Z THEN W ... ELSE sort_order
+    sort_map = {item["id"]: item["sort_order"] for item in orders}
+    id_list = list(sort_map.keys())
+    sort_case = case(sort_map, value=Chapter.id, else_=Chapter.sort_order)
+    await db.execute(
+        update(Chapter)
+        .where(Chapter.id.in_(id_list), Chapter.novel_id == novel_id)
+        .values(sort_order=sort_case)
+    )
     await db.flush()
 
 
 async def batch_delete_chapters(
     db: AsyncSession, novel_id: str, chapter_ids: list[str]
 ) -> int:
-    """Batch delete chapters."""
+    """Batch delete chapters with a single DELETE statement."""
+    if not chapter_ids:
+        return 0
     result = await db.execute(
-        select(Chapter).where(
+        delete(Chapter).where(
             Chapter.id.in_(chapter_ids),
             Chapter.novel_id == novel_id,
         )
     )
-    chapters = result.scalars().all()
-
-    for chapter in chapters:
-        await db.delete(chapter)
-
+    deleted = result.rowcount
     await db.flush()
-    await _recount_novel_chapters(db, novel_id)
-    return len(chapters)
+    await _recount_novel_chapters(db, novel_id, delta=-deleted)
+    asyncio.create_task(_invalidate_cache(novel_id))
+    return deleted
 
 
-async def _recount_novel_chapters(db: AsyncSession, novel_id: str) -> None:
-    """Update the novel's total_chapters denormalized count."""
-    count_result = await db.execute(
-        select(func.count(Chapter.id)).where(Chapter.novel_id == novel_id)
-    )
-    count = count_result.scalar() or 0
-    await db.execute(
-        update(Novel).where(Novel.id == novel_id).values(total_chapters=count)
-    )
+async def _recount_novel_chapters(
+    db: AsyncSession, novel_id: str, delta: Optional[int] = None
+) -> None:
+    """Update the novel's total_chapters denormalized count.
+
+    When *delta* is provided, uses an atomic ``total_chapters + delta``
+    increment (no COUNT scan).  When *delta* is None, falls back to a
+    full ``SELECT COUNT(*)`` for correctness (e.g. repair / migration).
+    """
+    if delta is not None and delta != 0:
+        await db.execute(
+            update(Novel)
+            .where(Novel.id == novel_id)
+            .values(total_chapters=Novel.total_chapters + delta)
+        )
+    else:
+        count_result = await db.execute(
+            select(func.count(Chapter.id)).where(Chapter.novel_id == novel_id)
+        )
+        count = count_result.scalar() or 0
+        await db.execute(
+            update(Novel).where(Novel.id == novel_id).values(total_chapters=count)
+        )

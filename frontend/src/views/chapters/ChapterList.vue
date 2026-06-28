@@ -164,7 +164,10 @@ async function handleDelete(chapterId: string) {
     await chaptersApi.delete(novelId, chapterId)
     ElMessage.success('章节已删除')
     await loadChapters()
-  } catch (e) { /* ignore */ }
+  } catch (e: any) {
+    console.error('Failed to delete chapter', e)
+    ElMessage.error('删除失败')
+  }
 }
 
 async function batchDelete() {
@@ -173,7 +176,10 @@ async function batchDelete() {
     ElMessage.success(`已删除 ${selectedIds.value.length} 个章节`)
     selectedIds.value = []
     await loadChapters()
-  } catch (e) { /* ignore */ }
+  } catch (e: any) {
+    console.error('Failed to batch delete', e)
+    ElMessage.error('批量删除失败')
+  }
 }
 
 async function handleBatchCreate() {
@@ -205,7 +211,10 @@ async function handleBatchCreate() {
 onMounted(async () => {
   try {
     novel.value = await novelsApi.get(novelId)
-  } catch (e) { /* ignore */ }
+  } catch (e: any) {
+    console.error('Failed to load novel', e)
+    ElMessage.error('加载小说信息失败')
+  }
   loadChapters()
 })
 </script>

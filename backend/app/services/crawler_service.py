@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crawlers.anti_detect import SmartClient
-from app.crawlers.content_cleaner import clean_title, clean_content as clean_chapter
+from app.crawlers.content_cleaner import clean_chapter_title, clean_content as clean_chapter
 from app.crawlers.registry import get_crawler
 from app.crawlers.rule_engine import load_rule
 from app.models.chapter import Chapter
@@ -65,7 +65,8 @@ async def auto_match_novel(novel: Novel, source_name: str) -> Optional[str]:
 def _parse_catalog(html: str) -> tuple[list[str], list[dict]]:
     """Return (volume_titles, chapter_list) from catalog HTML."""
     soup = BeautifulSoup(html, "lxml")
-    volumes = [el.get_text(strip=True) for el in soup.select(".module-title") if "阅读进度" not in el.get_text()]
+    # Volume headers: h2.module-title.type, excluding #shuqian (阅读进度)
+    volumes = [el.get_text(strip=True) for el in soup.select("h2.module-title.type") if el.find_parent(id="shuqian") is None]
     ch_items = soup.select(".module-row-info a.module-row-text")
     # Build volume map
     vol_map, cur_vol = [], volumes[0] if volumes else ""
@@ -130,8 +131,34 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                 if novel.source_url:
                     try:
                         info = await crawler.get_novel_info(novel.source_url)
+                        # Update title if it's a placeholder (Book-XXXX / Chapter-XXXX)
+                        if info.get("title") and (not novel.title or novel.title.startswith("Book-") or novel.title.startswith("Chapter-")):
+                            novel.title = info["title"]; await db.flush()
+                        # Save missing fields
+                        if info.get("author") and (not novel.author or novel.author == "未知"):
+                            novel.author = info["author"]; await db.flush()
                         desc = info.get("description", "")
                         if desc and not novel.description: novel.description = desc[:2000]; await db.flush()
+                        # Smart category mapping: match 23qb name to local by keyword overlap
+                        cat_name = info.get("category_name", "")
+                        if cat_name and not novel.categories:
+                            from app.models.category import Category as CatModel
+                            all_cats = (await db.execute(select(CatModel))).scalars().all()
+                            best, best_score = None, 0
+                            for lc in all_cats:
+                                score = 0
+                                if lc.name in cat_name: score += 10
+                                if cat_name in lc.name: score += 5
+                                for kw in ['言情','都市','唯美','耽美','百合','穿越','青春','玄幻','武侠','军事','竞技','科幻','悬疑','同人','职场','修真','历史','游戏','空间','惊悚','官场','魔法']:
+                                    if kw in lc.name and kw in cat_name: score += 3
+                                if score > best_score: best_score, best = score, lc
+                            # Edge case: 耽美百合 → 唯美
+                            if not best and '耽美' in cat_name:
+                                best = next((c for c in all_cats if c.name == '唯美'), None)
+                            if best and (best_score >= 3 or '耽美' in cat_name):
+                                novel.categories = [best]
+                                await db.flush(); await db.refresh(novel)
+                                session.emit(CrawlEvent("status", status="category", message=f"分类: {best.name}"))
                         cover_url = info.get("cover_url", "")
                         if cover_url and not novel.cover_image_url:
                             session.emit(CrawlEvent("status", status="cover", message="下载封面..."))
@@ -145,7 +172,8 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                         session.emit(CrawlEvent("status", status="cover", message=f"封面/简介失败: {exc}"))
 
                 # --- Phase 1: Catalog ---
-                book_id = re.search(r"/book/(\d+)", novel.source_url or "").group(1) if novel.source_url else ""
+                m = re.search(r"/book/(\d+)", novel.source_url or "")
+                book_id = m.group(1) if m else ""
                 catalog_url = f"{crawler.base_url}/book/{book_id}/catalog"
                 session.emit(CrawlEvent("status", status="catalog", message="获取章节目录..."))
                 catalog_html = await _fetch(catalog_url)
@@ -154,29 +182,35 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                                         message=f"发现 {len(all_chapters)} 章 ({len(volumes)} 卷)"))
 
                 # --- Incremental filter ---
-                existing = (await db.execute(select(Chapter).where(Chapter.novel_id == novel.id))).scalars().all()
-                exist_urls = {ch.source_url for ch in existing if ch.source_url}
-                exist_keys = {(ch.title, ch.sort_order) for ch in existing}
+                # Only fetch columns needed for dedup (not full TEXT content)
+                existing_rows = (await db.execute(
+                    select(Chapter.source_url, Chapter.title, Chapter.sort_order)
+                    .where(Chapter.novel_id == novel.id)
+                )).all()
+                exist_urls = {row[0] for row in existing_rows if row[0]}
+                exist_keys = {(row[1], row[2]) for row in existing_rows}
                 new_chapters = [c for c in all_chapters if c["url"] not in exist_urls and (c["title"], c["idx"] + 1) not in exist_keys]
+                # Re-index so idx matches position in filtered list
+                for i, c in enumerate(new_chapters): c["idx"] = i
                 skipped = len(all_chapters) - len(new_chapters)
                 if skipped > 0:
                     session.emit(CrawlEvent("status", status="incremental", message=f"增量: {len(new_chapters)} 新章, 跳过 {skipped} 已有"))
 
                 task.chapters_found = len(new_chapters)
                 if len(new_chapters) == 0:
-                    task.status = "completed"; task.finished_at = datetime.now(timezone.utc)
-                    await db.flush(); await session.close(); remove_session(task_id); return task
+                    task.status = "completed"; task.finished_at = datetime.now(timezone.utc); task.error_message = None
+                    await db.flush(); await db.commit(); remove_session(task_id); return task
 
                 # --- Phase 2: Concurrent chapter fetch ---
-                CONCURRENCY = 15; sem = asyncio.Semaphore(CONCURRENCY)
-                data = [{}] * len(new_chapters); done = 0; lock = asyncio.Lock()
+                CONCURRENCY = 25; sem = asyncio.Semaphore(CONCURRENCY)
+                data = [{} for _ in range(len(new_chapters))]; done = 0; lock = asyncio.Lock()
                 rule = load_rule(source_name); cleaner_cfg = rule.get("cleaner", {}) if rule else {}
                 session.emit(CrawlEvent("progress", phase="fetch", total=len(new_chapters),
                                         message=f"并发采集 {len(new_chapters)} 章 ({CONCURRENCY}线程)"))
 
                 async with httpx.AsyncClient(
                     timeout=30, follow_redirects=True,
-                    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+                    limits=httpx.Limits(max_connections=30, max_keepalive_connections=15),
                     headers={"User-Agent": "Mozilla/5.0 Chrome/130.0.0.0", "Accept": "text/html;q=0.9,*/*;q=0.8", "Accept-Language": "zh-CN"},
                 ) as pool:
                     async def _fetch_one(ch: dict):
@@ -196,9 +230,13 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                                         raw = _clean_text(cd.get_text())
                                         if raw: paras = [raw]
                                     content = "\n\n".join(paras)
-                            except Exception:
-                                pass
-                            data[ch["idx"]] = {"title": ch["title"], "content": content, "source_url": ch["url"], "sort_order": ch["idx"] + 1, "volume": ch.get("volume", "")}
+                            except Exception as exc:
+                                import logging; logging.getLogger("crawler").debug("Chapter fetch failed: %s", exc)
+                            # Clean chapter title — reject garbage
+                            chapter_title = clean_chapter_title(ch["title"])
+                            if not chapter_title:
+                                chapter_title = f"第{ch['idx'] + 1}章"  # fallback
+                            data[ch["idx"]] = {"title": chapter_title, "content": content, "source_url": ch["url"], "sort_order": ch["idx"] + 1, "volume": ch.get("volume", "")}
                             async with lock:
                                 nonlocal done; done += 1
                                 if cleaner_cfg.get("enabled") and content:
@@ -206,7 +244,7 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                                 elapsed = time.monotonic() - start_time
                                 spd = done / elapsed if elapsed > 0 else 0
                                 if done % max(1, len(new_chapters) // 20) == 0 or done <= 3:
-                                    session.emit(CrawlEvent("chapter", index=done, total=len(new_chapters), title=ch["title"],
+                                    session.emit(CrawlEvent("chapter", index=done, total=len(new_chapters), title=chapter_title,
                                         speed=round(spd, 1), eta=round((len(new_chapters) - done) / spd, 0) if spd > 0 else 0,
                                         content_preview=content[:120] if content else "(空)",
                                         message=f"[{done}/{len(new_chapters)}] {ch['title']}"))
@@ -234,7 +272,7 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
     finally:
         await session.close()
 
-    await db.flush(); await db.refresh(task); remove_session(task_id)
+    await db.flush(); await db.commit(); await db.refresh(task); remove_session(task_id)
     return task
 
 # ---------------------------------------------------------------------------
@@ -249,7 +287,10 @@ async def run_batch_crawl(db: AsyncSession, novel_ids: list[str], source_name: O
     await db.flush(); [await db.refresh(t) for t in tasks]
     for t in tasks:
         try: await run_crawl(db, str(t.id), mode=mode)
-        except Exception: pass
+        except Exception as exc:
+            import logging; logging.getLogger("crawler").error("Batch task %s failed: %s", t.id, exc)
+            t.status = "failed"
+            t.error_message = str(exc)[:500]
     return tasks
 
 # ---------------------------------------------------------------------------
