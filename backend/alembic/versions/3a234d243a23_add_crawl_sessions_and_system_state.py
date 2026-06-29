@@ -26,8 +26,6 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(),
                   onupdate=sa.func.now()),
-        mysql_engine='InnoDB',
-        mysql_charset='utf8mb4',
     )
 
     # system_state — distributed lock for queue coordination (no Redis needed)
@@ -41,8 +39,6 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(),
                   onupdate=sa.func.now()),
-        mysql_engine='InnoDB',
-        mysql_charset='utf8mb4',
     )
 
 

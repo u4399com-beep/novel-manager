@@ -63,13 +63,22 @@ async def _db_upsert_session(task_id: str, novel_title: str, status: str):
     """Persist session metadata to DB for cross-worker discovery."""
     try:
         from app.database import async_session_factory
+        from app.config import settings
         from sqlalchemy import text
+        is_pg = "postgresql" in settings.DATABASE_URL
+        sql = (
+            "INSERT INTO crawl_sessions (task_id, novel_title, status, worker_pid) "
+            "VALUES (:tid, :title, :status, :pid) "
+            "ON CONFLICT (task_id) DO UPDATE SET novel_title=EXCLUDED.novel_title, "
+            "status=EXCLUDED.status, worker_pid=EXCLUDED.worker_pid"
+        ) if is_pg else (
+            "INSERT INTO crawl_sessions (task_id, novel_title, status, worker_pid) "
+            "VALUES (:tid, :title, :status, :pid) "
+            "ON DUPLICATE KEY UPDATE novel_title=:title, status=:status, worker_pid=:pid"
+        )
         async with async_session_factory() as db:
-            await db.execute(text(
-                "INSERT INTO crawl_sessions (task_id, novel_title, status, worker_pid) "
-                "VALUES (:tid, :title, :status, :pid) "
-                "ON DUPLICATE KEY UPDATE novel_title=:title, status=:status, worker_pid=:pid"
-            ), {"tid": task_id, "title": novel_title, "status": status, "pid": os.getpid()})
+            await db.execute(text(sql),
+                {"tid": task_id, "title": novel_title, "status": status, "pid": os.getpid()})
             await db.commit()
     except Exception:
         pass  # table may not exist yet (first run before migration)

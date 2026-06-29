@@ -6,14 +6,21 @@ from app.config import settings
 
 _is_sqlite = "sqlite" in settings.DATABASE_URL
 _is_mysql = "mysql" in settings.DATABASE_URL or "asyncmy" in settings.DATABASE_URL
+_is_postgres = "postgresql" in settings.DATABASE_URL or "asyncpg" in settings.DATABASE_URL
 
 _kwargs: dict = {"echo": False, "future": True}
-if _is_mysql:
-    # Per-worker pool: sized for 8 workers under MySQL max_connections=151
-    # 8 workers × (12+6) = 144 < 151 (safe)
+if _is_postgres:
     import os as _os
     _workers = int(_os.getenv("GUNICORN_WORKERS", _os.getenv("UVICORN_WORKERS", "4")))
-    # Target: total connections <= 144 (safe under MySQL default max_connections=151)
+    _kwargs.update(
+        pool_size=min(20, 80 // max(_workers, 1)),
+        max_overflow=10,
+        pool_recycle=1800,
+        pool_timeout=15,
+    )
+elif _is_mysql:
+    import os as _os
+    _workers = int(_os.getenv("GUNICORN_WORKERS", _os.getenv("UVICORN_WORKERS", "4")))
     _max_total = 144
     _pool_per_worker = max(6, min(30, _max_total // max(_workers, 1) - 4))
     _overflow_per_worker = max(2, _pool_per_worker // 4)

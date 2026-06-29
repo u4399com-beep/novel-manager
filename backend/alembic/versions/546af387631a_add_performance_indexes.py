@@ -30,14 +30,8 @@ def _safe_create_index(name: str, table: str, cols: list[str], unique: bool = Fa
 
 
 def _safe_drop_index(name: str, table: str):
-    """Idempotent index drop — catches Can't DROP (err 1091)."""
-    try:
-        op.drop_index(name, table_name=table)
-    except OperationalError as e:
-        if hasattr(e.orig, 'args') and e.orig.args and '1091' in str(e.orig.args[0]):
-            pass  # already dropped or never existed
-        else:
-            raise
+    """Idempotent index drop — DROP INDEX IF EXISTS (PostgreSQL + MySQL compatible)."""
+    op.execute(sa.text(f"DROP INDEX IF EXISTS {name}"))
 
 
 def upgrade() -> None:
@@ -85,11 +79,11 @@ def downgrade() -> None:
               'link_ring_targets', 'crawler_tasks', 'chapters']:
         op.create_index(f'ix_{t}_id', t, ['id'], unique=False)
 
-    op.drop_index('ix_link_rings_active_site', table_name='link_rings')
-    op.drop_index('ix_novels_source_url', table_name='novels')
-    op.drop_index('ix_novels_status_updated', table_name='novels')
-    op.drop_index('ix_crawler_tasks_novel_status', table_name='crawler_tasks')
-    op.drop_index('ix_crawler_tasks_status_created', table_name='crawler_tasks')
-    op.drop_index('ix_chapters_novel_published', table_name='chapters')
-    op.drop_index('ix_chapters_novel_source_url', table_name='chapters')
-    op.drop_index('ix_chapters_novel_sort', table_name='chapters')
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_link_rings_active_site"))
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_novels_source_url"))
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_novels_status_updated"))
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_crawler_tasks_novel_status"))
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_crawler_tasks_status_created"))
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_chapters_novel_published"))
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_chapters_novel_source_url"))
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_chapters_novel_sort"))
