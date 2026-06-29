@@ -166,15 +166,17 @@ async def batch_create_chapters(
     max_order = max_result.scalar() or 0
 
     chapters = []
-    for i, data in enumerate(chapters_data):
+    accepted = 0
+    for data in chapters_data:
         # Skip chapters with garbage titles
         raw_title = data.get("title", "")
         if not is_valid_chapter_title(raw_title):
             continue
+        accepted += 1
 
         sort_order = data.get("sort_order")
         if sort_order is None:
-            sort_order = max_order + i + 1
+            sort_order = max_order + accepted
 
         text = data.get("content", "")
         chapter = Chapter(

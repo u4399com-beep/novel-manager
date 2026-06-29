@@ -99,7 +99,9 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
         # Add translation filter
         _t_cache = {}
         def _translate_filter(text, target_lang):
-            if not text or target_lang == "zh":
+            if text is None:
+                return ""
+            if target_lang == "zh" or not text:
                 return text
             cache_key = f"{hash(text)}:{target_lang}"
             if cache_key in _t_cache:
@@ -125,6 +127,7 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
 # Site context helper
 # ── In-process TTL cache for ORM objects (avoids Redis serialization) ──
 _orm_cache: dict[str, tuple[float, object]] = {}
+_ORM_MISS = object()  # sentinel to distinguish cached None from cache miss
 
 
 def _cached_orm(key: str, ttl: int, compute):
@@ -134,8 +137,8 @@ def _cached_orm(key: str, ttl: int, compute):
     if key in _orm_cache:
         expiry, val = _orm_cache[key]
         if now < expiry:
-            return val
-    return None  # miss — caller must compute and store
+            return val if val is not _ORM_MISS else None
+    return _ORM_MISS  # signal miss — caller must compute and store
 
 
 def _set_orm_cache(key: str, val: object, ttl: int):
@@ -149,7 +152,7 @@ async def _get_site(request, db) -> Optional[Site]:
     cache_key = f"site:{host}"
 
     cached = _cached_orm(cache_key, ttl=3600, compute=None)
-    if cached is not None:
+    if cached is not _ORM_MISS:
         return cached
 
     result = await db.execute(
@@ -165,7 +168,7 @@ async def _get_categories(db) -> list:
     cache_key = "all_categories"
 
     cached = _cached_orm(cache_key, ttl=300, compute=None)
-    if cached is not None:
+    if cached is not _ORM_MISS:
         return cached
 
     cats = (await db.execute(
@@ -680,7 +683,10 @@ async def site_chapter(
     # ---- Chapter pagination ----
     all_pages = _paginate_chapter(chapter_content, site)
     page_param = site.chapter_pagination.get("page_param", "page") if site and site.chapter_pagination else "page"
-    current_page = int(request.query_params.get(page_param, 1))
+    try:
+        current_page = int(request.query_params.get(page_param, 1))
+    except (ValueError, TypeError):
+        current_page = 1
     total_pages = len(all_pages)
     if current_page < 1:
         current_page = 1
@@ -704,7 +710,7 @@ async def site_chapter(
                 Novel.cover_image_url.isnot(None),
                 Novel.cover_image_url != "",
             )
-            .order_by(func.rand())
+            .order_by(func.random())
             .limit(5)
         )
         rand_novels = rand_result.unique().scalars().all()

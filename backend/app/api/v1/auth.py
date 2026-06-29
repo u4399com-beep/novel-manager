@@ -71,5 +71,6 @@ async def update_me(
     if data.password is not None:
         current_user.hashed_password = hash_password(data.password)
     await db.flush()
+    await db.commit()  # persist before refresh
     await db.refresh(current_user)
     return current_user

@@ -1,5 +1,6 @@
 """Search API — FULLTEXT for chapters; ILIKE for novels."""
 import math
+import re
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select, text
@@ -50,7 +51,8 @@ async def search(
     else:  # chapter — FULLTEXT for 3+ chars; ILIKE for 2-char
         qs = q.strip()
         if len(qs) >= 3:
-            safe_q = qs.replace("'", "''").replace('"', '""')
+            # Strip FULLTEXT boolean operators to prevent syntax errors
+            safe_q = re.sub(r'[+\-><()~*"@]', '', qs).replace("'", "''")
             match_filter = Chapter.title.match(safe_q)
         else:
             # 2-char: ILIKE (acceptable row count for 2-char patterns)
