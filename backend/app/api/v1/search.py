@@ -14,16 +14,6 @@ from app.schemas.novel import NovelRead
 router = APIRouter()
 
 
-def _match_clause(column, query: str):
-    """Return MATCH AGAINST for FULLTEXT; ILIKE fallback for short queries."""
-    # For 1-char queries, FULLTEXT ngram may not match well — use ILIKE
-    if len(query.strip()) <= 1:
-        return column.ilike(f"%{query}%")
-    # Escape special FULLTEXT operators and use BOOLEAN MODE
-    safe_q = query.replace("'", "''").replace('"', '""')
-    return column.match(safe_q)
-
-
 @router.get("")
 async def search(
     q: str = Query(min_length=1, description="Search query"),
@@ -32,7 +22,14 @@ async def search(
     size: int = 20,
     db: AsyncSession = Depends(get_db),
 ):
-    """Search across novels or chapters."""
+    """Search across novels or chapters.
+
+    Chapter search requires >=2 characters (ngram FULLTEXT minimum).
+    Shorter queries are rejected to avoid full-table scans on 1.9M rows.
+    """
+    if type == "chapter" and len(q.strip()) < 2:
+        return {"items": [], "total": 0, "page": 1, "size": size, "pages": 0}
+
     if type == "novel":
         query = (
             select(Novel)
@@ -42,18 +39,23 @@ async def search(
                 | Novel.description.ilike(f"%{q}%")
             )
         )
-        # Count
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await db.execute(count_query)
         total = total_result.scalar() or 0
 
-        # Paginate
         query = query.order_by(Novel.updated_at.desc()).offset((page - 1) * size).limit(size)
         result = await db.execute(query)
         items = [NovelRead.model_validate(n) for n in result.unique().scalars().all()]
 
-    else:  # chapter — use FULLTEXT index for fast search
-        match_filter = _match_clause(Chapter.title, q)
+    else:  # chapter — FULLTEXT for 3+ chars; ILIKE for 2-char
+        qs = q.strip()
+        if len(qs) >= 3:
+            safe_q = qs.replace("'", "''").replace('"', '""')
+            match_filter = Chapter.title.match(safe_q)
+        else:
+            # 2-char: ILIKE (acceptable row count for 2-char patterns)
+            match_filter = Chapter.title.ilike(f"%{qs}%")
+
         query = select(Chapter).where(match_filter)
 
         count_query = select(func.count()).select_from(query.subquery())

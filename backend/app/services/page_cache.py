@@ -13,7 +13,7 @@ from typing import Optional
 class PageCache:
     """LRU-ish TTL cache for rendered HTML pages."""
 
-    def __init__(self, max_size: int = 500):
+    def __init__(self, max_size: int = 1000):
         self._cache: OrderedDict[str, tuple[float, str]] = OrderedDict()
         self._max_size = max_size
         self._lock = asyncio.Lock()
@@ -27,7 +27,7 @@ class PageCache:
             "search": 10,
             "novel_detail": 30,
             "chapter_list": 5,
-            "chapter_read": 0,  # no cache
+            "chapter_read": 5,  # cached per-chapter — heavy I/O path
         }
 
     def _key(self, path: str, query: str, lang: str) -> str:
