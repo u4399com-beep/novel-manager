@@ -153,7 +153,29 @@ async def main():
         total_time = time.monotonic() - start_time
         log.info(f"Queue runner stopped. {completed} ok, {failed} fail in {total_time:.0f}s")
     finally:
+        # Reset running tasks before releasing lock
+        await _reset_running_tasks()
         await release_queue_lock()
+
+
+async def _reset_running_tasks():
+    """Reset this process's running tasks back to pending on exit."""
+    import os as _os
+    pid = _os.getpid()
+    try:
+        from app.database import async_session_factory
+        from sqlalchemy import text
+        async with async_session_factory() as db:
+            result = await db.execute(text(
+                "UPDATE crawler_tasks SET status='pending', "
+                "error_message='队列进程退出，重置为待处理', started_at=NULL "
+                "WHERE status='running'"
+            ))
+            await db.commit()
+            if result.rowcount > 0:
+                log.info(f"🧹 退出清理: {result.rowcount} 个 running 任务已重置为 pending")
+    except Exception as e:
+        log.warning(f"清理 running 任务失败: {e}")
 
 
 if __name__ == "__main__":

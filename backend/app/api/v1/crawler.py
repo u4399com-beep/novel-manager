@@ -682,6 +682,20 @@ async def _queue_worker():
             break
 
     _queue_running = False
+    # Reset running tasks to pending on exit
+    try:
+        from sqlalchemy import text as _sa_text
+        async with async_session_factory() as s:
+            reset = await s.execute(
+                _sa_text("UPDATE crawler_tasks SET status='pending', "
+                         "error_message='队列进程退出，重置为待处理', started_at=NULL "
+                         "WHERE status='running'")
+            )
+            if reset.rowcount > 0:
+                _queue_log.info(f"🧹 退出清理: {reset.rowcount} 个 running 任务已重置")
+            await s.commit()
+    except Exception:
+        pass
     # Auto-restart if tasks remain
     await asyncio.sleep(5)
     async with async_session_factory() as s:
