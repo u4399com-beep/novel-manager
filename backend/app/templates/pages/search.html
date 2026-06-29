@@ -16,7 +16,7 @@
   <div class="search-results">
     {% for novel in results %}
     <article class="search-item">
-      <h3><a href="/novel/{{ novel.id }}">{{ novel.title }}</a></h3>
+      <h3><a href="/novel/{{ novel.id }}">{{ novel.title | translate(lang) }}</a></h3>
       <p class="meta">{{ novel.author }} ·
         {% if novel.status == 'completed' %}{{ T('completed') }}{% else %}{{ T('ongoing') }}{% endif %} ·
         {{ novel.total_chapters }} {{ T('chapters_count') }}</p>

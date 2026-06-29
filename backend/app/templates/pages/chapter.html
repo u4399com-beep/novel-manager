@@ -11,7 +11,7 @@
 {% block content %}
 <div class="box view-heading">
   <div class="chepnav">{{ T('current_position') }}：<a href="/">{{ T('breadcrumb_home') }}</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; {{ chapter.title }}</div>
-  <h1 class="article-title">{{ chapter.title }}</h1>
+  <h1 class="article-title">{{ chapter.title | translate(lang) }}</h1>
   <div class="article-info">{{ novel.author }} · {{ chapter.word_count }}字 · {{ chapter.updated_at.strftime('%Y-%m-%d') if chapter.updated_at else '' }}</div>
 
   <!-- Random 5 Book Recommendations -->
@@ -25,7 +25,7 @@
           <img src="{{ rn.cover_image_url }}" alt="{{ rn.title }}" loading="lazy">
         </div>
         <div class="rand-book-info">
-          <div class="rand-book-title">{{ rn.title }}</div>
+          <div class="rand-book-title">{{ rn.title | translate(lang) }}</div>
           <div class="rand-book-chapter">
             {% if rn.latest_title %}
             {{ rn.latest_title[:20] }}
@@ -64,7 +64,9 @@
 
   <div class="article-content" id="articleContent">
     {% if chapter.content %}
-    {% for para in chapter.content.split('\n\n') %}{% set t=para.strip() %}{% if t and t|length>3 %}<p>{{ t }}</p>{% endif %}{% endfor %}
+    {% set _ct = chapter.content | replace('\r\n', '\n') %}
+{% set _paras = _ct.split('\n\n') if '\n\n' in _ct else _ct.split('\n') %}
+{% for para in _paras %}{% set t=para.strip() %}{% if t and t|length>3 %}<p>{{ t }}</p>{% endif %}{% endfor %}
     {% else %}<p class="empty">{{ T('no_description') }}</p>{% endif %}
   </div>
 

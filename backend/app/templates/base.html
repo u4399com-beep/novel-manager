@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>{% block title %}{{ T('home') }}{% endblock %} - {{ site.name if site else T('site_name') }}</title>
+<title>{% block title %}{{ T('home') }}{% endblock %} - {{ (site.name if site else T('site_name')) | translate(lang) }}</title>
 <meta name="description" content="{% block description %}免费在线小说阅读，海量精品网络小说资源{% endblock %}">
 <meta name="keywords" content="{% block keywords %}小说,网络小说,免费小说,在线阅读{% endblock %}">
 <meta name="robots" content="index,follow">
@@ -19,12 +19,12 @@
 <body>
 <header id="header" class="wrapper">
   <div class="header-content">
-    <div class="header-logo"><a href="/" class="logo">📚 {{ site.name if site else T('site_name') }}</a></div>
+    <div class="header-logo"><a href="/" class="logo">📚 {{ (site.name if site else T('site_name')) | translate(lang) }}</a></div>
     <nav class="nav">
       <ul class="nav-menu-items">
         <li class="nav-menu-item{% if request.url.path=='/' %} selected{% endif %}"><a href="/">{{ T('home') }}</a></li>
         {% for cat in (categories or [])[:12] %}
-        <li class="nav-menu-item"><a href="/novels?category={{ cat.id }}">{{ cat.name }}</a></li>
+        <li class="nav-menu-item"><a href="/novels?category={{ cat.id }}">{{ cat.name | translate(lang) }}</a></li>
         {% endfor %}
       </ul>
     </nav>

@@ -26,7 +26,7 @@
        class="link-wheel-item"
        {% if link.open_new_tab %}target="_blank"{% endif %}
        {% if link.nofollow %}rel="nofollow"{% endif %}>
-      {{ link.anchor_text }}
+      {{ link.anchor_text | translate(lang) }}
     </a>
     {% endfor %}
   </div>

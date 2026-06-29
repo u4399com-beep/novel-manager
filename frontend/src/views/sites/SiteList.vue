@@ -80,6 +80,7 @@
                 <el-option v-for="l in langOptions" :key="l.code" :label="l.name" :value="l.code"/>
               </el-select>
             </el-form-item>
+            <el-form-item label="翻译功能"><el-switch v-model="form.translate_enabled"/></el-form-item>
             <el-form-item label="启用"><el-switch v-model="form.is_active"/></el-form-item>
             <el-form-item label="描述"><el-input v-model="form.description" type="textarea" :rows="2"/></el-form-item>
           </el-form>
@@ -269,7 +270,7 @@ const langOptions = [
 ]
 
 const defaultForm = () => ({
-  name:'', domain:'', template:'default', offset:0, is_active:true, description:'', language:'zh',
+  name:'', domain:'', template:'default', offset:0, is_active:true, description:'', language:'zh', translate_enabled: true,
   url_patterns: { novel_detail:'', chapter_list:'', chapter_read:'', category_list:'', search:'' },
   chapter_pagination: { enabled:false, method:'word_count', words_per_page:3000, pages_per_chapter:3, page_param:'page', canonical_first_page:true },
   link_wheel: { enabled:false, max_links_per_page:8, link_section:'sidebar', open_new_tab:true, nofollow:false },
@@ -349,7 +350,7 @@ function openDialog(row?: any) {
   if (row) {
     editing.value = true; editId.value = row.id
     Object.assign(form, {
-      name:row.name, domain:row.domain, template:row.template, language:row.language||'zh',
+      name:row.name, domain:row.domain, template:row.template, language:row.language||'zh',translate_enabled:row.translate_enabled ?? true,
       offset:row.offset, is_active:row.is_active, description:row.description||'',
       url_patterns: Object.assign({novel_detail:'',chapter_list:'',chapter_read:'',category_list:'',search:''}, row.url_patterns || {}),
       chapter_pagination: Object.assign({enabled:false,method:'word_count',words_per_page:3000,pages_per_chapter:3,page_param:'page',canonical_first_page:true}, row.chapter_pagination || {}),

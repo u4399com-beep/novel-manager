@@ -14,6 +14,7 @@ class Site(Base, TimestampMixin):
     offset: Mapped[int] = mapped_column("offset_val", Integer, default=0, comment="Novel offset for content differentiation")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    translate_enabled: Mapped[bool] = mapped_column(default=True, comment="Enable real-time translation via LibreTranslate")
     language: Mapped[str] = mapped_column(String(10), default="zh", comment="Site language code: zh,en,ja,ko,fr,de,es,pt,ru,ar,th,vi,id,it,tr,hi,ms")
 
     # ---- Pseudo-static URL patterns ----

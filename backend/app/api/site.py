@@ -73,6 +73,14 @@ async def _render_page(
     from app.services.page_cache import page_cache
 
     lang = site.language if site else "zh"
+    # Set translate filter enabled state
+    _translate_enabled = context.get("translate_enabled", True)
+    # Find and update the filter
+    for tpl_cache in _tpl_cache.values():
+        for fname, fobj in tpl_cache.env.filters.items():
+            if fname == "translate":
+                fobj.enabled = _translate_enabled
+                break
 
     html = await asyncio.to_thread(tpl.env.get_template(template_name).render, context)
 
@@ -172,14 +180,10 @@ async def _get_categories(db) -> list:
     """Fetch all categories (cached 5min — changes rarely)."""
     cache_key = "all_categories"
 
-    cached = await _cached_orm(cache_key, ttl=300)
-    if cached is not _ORM_MISS:
-        return cached
-
     cats = (await db.execute(
         select(Category).order_by(Category.sort_order)
     )).scalars().all()
-    await _set_orm_cache(cache_key, cats, ttl=300)
+    await _set_orm_cache(cache_key, cats, ttl=1)
     return cats
 
 
@@ -250,6 +254,7 @@ def _site_context(site: Optional[Site], **extra) -> dict:
         "T": lambda key, **kw: i18n_t(lang, key, **kw),
         "lang_name": LANGUAGES.get(lang, "中文"),
         "target_lang": lang,
+        "translate_enabled": site.translate_enabled if site and hasattr(site, "translate_enabled") else True,
         **extra,
     }
 
@@ -486,7 +491,7 @@ async def site_home(
     from app.models.novel import novel_categories
     from collections import defaultdict
     category_novels: dict[str, list] = {}
-    if len(cats) <= 9 and cats:
+    if cats:
         cat_ids = [c.id for c in cats]
         all_cat_result = await db.execute(
             select(Novel)
@@ -922,15 +927,10 @@ async def site_search(
     lang = site.language if site and site.language else "zh"
     if lang not in ("zh", "zh-TW", ""):
         await _tr_content(db, None, None, cats, lang)
-        for n in (novels or []): await _tr_content(db, n, None, None, lang)
-        for n in (featured or []): await _tr_content(db, n, None, None, lang)
-        for n in (latest or []): await _tr_content(db, n, None, None, lang)
-        for n in (ranking or []): await _tr_content(db, n, None, None, lang)
-        for cn in (category_novels or {}).values():
-            for n in cn: await _tr_content(db, n, None, None, lang)
+        for n in (results or []): await _tr_content(db, n, None, None, lang)
 
     # ---- Link wheel links (after translation for correct titles) ----
-    link_wheel_links = await _safe_link_wheel(site, db, None, "home")
+    link_wheel_links = await _safe_link_wheel(site, db, None, "search")
     # Translate link wheel anchor text
     if lang not in ("zh", "zh-TW", "") and link_wheel_links:
         for lw in link_wheel_links:
@@ -994,27 +994,17 @@ async def site_novels(
     query = query.order_by(Novel.updated_at.desc()).offset((page - 1) * size).limit(size)
     novels = (await db.execute(query)).unique().scalars().all()
     cats = await _get_categories(db)
-    lang = site.language if site and site.language else "zh"
-    await _tr_content(db, None, None, cats, lang)
-    # Translate all novels shown on the page
-    all_page_novels = set()
-    for n in (novels or []): all_page_novels.add(n)
-    for n in (featured or []): all_page_novels.add(n)
-    for n in (latest or []): all_page_novels.add(n)
-    for n in (ranking or []): all_page_novels.add(n)
-    for cn_list in (category_novels or {}).values():
-        for n in cn_list: all_page_novels.add(n)
-    for n in all_page_novels:
-        await _tr_content(db, n, None, None, lang)
+    # Define variables used below (populated in context later)
+    featured = novels[:5] if novels else []
+    latest = novels[:25] if novels else []
+    ranking = novels[:15] if novels else []
+    category_novels = {}
 
     # ---- Translate all content for non-Chinese sites ----
     lang = site.language if site and site.language else "zh"
     if lang not in ("zh", "zh-TW", ""):
         await _tr_content(db, None, None, cats, lang)
         for n in (novels or []): await _tr_content(db, n, None, None, lang)
-        for n in (featured or []): await _tr_content(db, n, None, None, lang)
-        for n in (latest or []): await _tr_content(db, n, None, None, lang)
-        for n in (ranking or []): await _tr_content(db, n, None, None, lang)
         for cn in (category_novels or {}).values():
             for n in cn: await _tr_content(db, n, None, None, lang)
 

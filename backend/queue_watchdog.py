@@ -102,8 +102,44 @@ async def reset_stuck_tasks():
             log.info(f"Reset {result.rowcount} stuck tasks → pending")
 
 
+async def repair_empty_chapters():
+    """Auto-create crawl tasks for novels with empty chapters."""
+    from app.database import async_session_factory
+    from app.models.chapter import Chapter
+    from app.models.crawler_task import CrawlerTask
+    from sqlalchemy import select, func, and_
+
+    async with async_session_factory() as db:
+        # Find novels with empty chapters but with source URLs
+        result = await db.execute(
+            select(Chapter.novel_id, func.count())
+            .where(and_(Chapter.content == None, Chapter.content_file == None, Chapter.source_url != None))
+            .group_by(Chapter.novel_id)
+            .limit(20)
+        )
+        novel_counts = result.all()
+        
+        created = 0
+        for nid, cnt in novel_counts:
+            # Check if already has a pending task
+            existing = (await db.execute(
+                select(func.count()).where(
+                    CrawlerTask.novel_id == nid, CrawlerTask.status == 'pending'
+                )
+            )).scalar() or 0
+            if existing == 0:
+                db.add(CrawlerTask(novel_id=nid, status='pending'))
+                created += 1
+        
+        if created:
+            await db.commit()
+            log.info(f"Auto-repair: created {created} tasks for {len(novel_counts)} novels with empty chapters")
+        return created
+
 async def watchdog_cycle():
     """One watchdog check cycle."""
+    # Auto-repair empty chapters
+    await repair_empty_chapters()
     stats = await get_queue_stats()
     alive = is_runner_alive()
 

@@ -58,7 +58,7 @@ img{max-width:100%;height:auto}.wrapper{width:100%}
 .hero-slide:nth-child(5){background:linear-gradient(135deg,#ff9f1c,#ff6d00)}
 
 /* Category Grid — 3 per row */
-.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;width:100%}
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;width:100%}
 
 /* Section */
 .section{margin-bottom:16px;background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}

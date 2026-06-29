@@ -148,7 +148,7 @@ def _add_to_cache(key: str, text: str):
     # Evict oldest entries if over limits
     while _cache and (_cache_bytes > MAX_CACHE_BYTES or len(_cache) > MAX_CACHE_ITEMS):
         oldest_key, oldest_val = _cache.popitem(last=False)
-        _cache_bytes -= len(oldest_val)
+        _cache_bytes -= len(oldest_val.encode("utf-8"))
 
 
 # ── Async wrappers (offload blocking I/O to thread pool) ──────────────

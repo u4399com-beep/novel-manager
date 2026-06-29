@@ -27,7 +27,7 @@
           {% else %}<span class="cover-noimg">📖</span>{% endif %}
         </a>
         <div class="hero-info">
-          <h2><a href="/novel/{{ novel.id }}">{{ novel.title }}</a></h2>
+          <h2><a href="/novel/{{ novel.id }}">{{ novel.title | translate(lang) }}</a></h2>
           <p class="hero-author">{{ novel.author or T('unknown_author') }}</p>
           <p class="hero-desc">{{ (novel.description or T('no_description'))[:120] }}...</p>
           <a href="/novel/{{ novel.id }}/chapters" class="hero-btn">{{ T('start_reading') }}</a>
@@ -44,7 +44,7 @@
 
     <!-- Category Sections — 3 per row -->
     {% if modules.category_sections %}
-    <div class="cat-grid">
+    <div class="section"><div class="cat-grid">
     {% for cat in (categories or [])[:9] %}
     {% set cat_novels = (category_novels or {}).get(cat.id|string, []) %}
     {% if cat_novels %}
@@ -58,7 +58,7 @@
           {% else %}<span class="cover-noimg sm">📖</span>{% endif %}
         </a>
         <div class="cf-info">
-          <h3><a href="/novel/{{ cat_novels[0].id }}">{{ cat_novels[0].title }}</a></h3>
+          <h3><a href="/novel/{{ cat_novels[0].id }}">{{ cat_novels[0].title | translate(lang) }}</a></h3>
           <p class="cf-author">{{ cat_novels[0].author or T('unknown_author') }}</p>
           <p class="cf-desc">{{ (cat_novels[0].description or T('no_description'))[:80] }}...</p>
           <a href="/novel/{{ cat_novels[0].id }}/chapters" class="cf-chapter">
@@ -75,7 +75,7 @@
     </div>
     {% endif %}
     {% endfor %}
-    </div>
+    </div></div>
     {% endif %}
 
     <!-- Latest Updates -->
@@ -93,7 +93,7 @@
         {% for novel in (latest_novels or novels)[:25] %}
         <div class="latest-row">
           <span class="col-cat">{% if novel.categories %}{{ novel.categories[0].name }}{% else %}-{% endif %}</span>
-          <span class="col-title"><a href="/novel/{{ novel.id }}">{{ novel.title }}</a></span>
+          <span class="col-title"><a href="/novel/{{ novel.id }}">{{ novel.title | translate(lang) }}</a></span>
           <span class="col-chapter">
             {% if novel.latest_chapter_id %}
             <a href="/chapter/{{ novel.latest_chapter_id }}">{{ (novel.latest_title or '最新')[:30] }}</a>
@@ -119,7 +119,7 @@
         <li>
           <span class="rank-num{% if loop.index <= 3 %} top{{ loop.index }}{% endif %}">{{ loop.index }}</span>
           <a href="/novel/{{ novel.id }}">{{ novel.title }}</a>
-          <span class="rank-chapters">{{ novel.total_chapters }}章</span>
+          <span class="rank-chapters">{{ novel.total_chapters }}{{ T('chapters_count') }}</span>
         </li>
         {% endfor %}
       </ol>

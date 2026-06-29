@@ -26,7 +26,7 @@
   </div>
   <div class="novel-info">
     <div class="novel-info-header">
-      <h1 class="page-title">{{ novel.title }}</h1>
+      <h1 class="page-title">{{ novel.title | translate(lang) }}</h1>
       <div class="novel-info-aux">
         <a class="tag-link">{{ T('novel_author') }}{{ novel.author }}</a>
         {% for cat in novel.categories %}<a href="/novels?category={{ cat.id }}" class="tag-link">{{ cat.name }}</a>{% endfor %}
