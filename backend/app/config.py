@@ -1,7 +1,6 @@
 """Application settings loaded from environment variables / .env file."""
 
 import logging
-import secrets
 
 from pydantic_settings import BaseSettings
 

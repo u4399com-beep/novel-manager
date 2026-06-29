@@ -66,28 +66,6 @@ class RuleBasedCrawler(BaseCrawler):
         if description:
             self.description = description
         self._client: Optional[httpx.AsyncClient] = None
-
-    @property
-    def client(self) -> httpx.AsyncClient:
-        if self._client is None:
-            self._client = httpx.AsyncClient(
-                timeout=settings.CRAWLER_TIMEOUT,
-                headers=HEADERS,
-                follow_redirects=True,
-            )
-        return self._client
-
-    async def close(self) -> None:
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-
-    # ------------------------------------------------------------------
-    # Core helpers
-    # ------------------------------------------------------------------
-
-    def __init__(self) -> None:
-        super().__init__()
         self._cached_rule: Optional[dict] = None
 
     def _rule(self):

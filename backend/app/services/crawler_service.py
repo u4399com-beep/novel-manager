@@ -24,7 +24,11 @@ from app.services.novel_service import save_cover_image as save_cover
 # Task CRUD
 # ---------------------------------------------------------------------------
 async def create_crawler_task(db: AsyncSession, novel_id: str, source_name: Optional[str] = None) -> CrawlerTask:
-    t = CrawlerTask(novel_id=novel_id, status="pending"); db.add(t); await db.flush(); await db.refresh(t); return t
+    t = CrawlerTask(novel_id=novel_id, status="pending")
+    db.add(t)
+    await db.flush()
+    await db.refresh(t)
+    return t
 
 async def get_crawler_task(db: AsyncSession, task_id: str) -> Optional[CrawlerTask]:
     return (await db.execute(select(CrawlerTask).where(CrawlerTask.id == task_id))).scalar_one_or_none()

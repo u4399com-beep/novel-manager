@@ -40,7 +40,10 @@ else:
 if _is_sqlite:
     @event.listens_for(engine.sync_engine, "connect")
     def _sqlite_pragma(conn, _):
-        c = conn.cursor(); c.execute("PRAGMA journal_mode=WAL"); c.execute("PRAGMA busy_timeout=20000"); c.close()
+        c = conn.cursor()
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=20000")
+        c.close()
 
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

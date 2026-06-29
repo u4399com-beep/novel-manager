@@ -357,7 +357,6 @@ async def trigger_page_crawl(
                 cover_task = asyncio.create_task(_download_cover(str(novel.id), cover_url))
                 cover_task.add_done_callback(lambda t: _running_tasks.discard(t))
                 _running_tasks.add(cover_task)
-            imported_count += 1
 
         await db.flush()
         await db.refresh(novel)

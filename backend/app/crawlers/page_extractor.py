@@ -9,13 +9,12 @@ Supports:
 Uses rule-engine selectors when available, falls back to generic extraction.
 """
 
+import asyncio
 import re
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
-
-
 
 from app.crawlers.anti_detect import SmartClient
 from app.crawlers.content_cleaner import clean_chapter_title, clean_novel_title

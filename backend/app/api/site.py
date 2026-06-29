@@ -9,7 +9,6 @@ Features:
 import asyncio
 import math
 import os
-import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -126,10 +125,8 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
 
 # Site context helper
 # ── In-process TTL cache for ORM objects (avoids Redis serialization) ──
-import asyncio as _asyncio
-
 _orm_cache: dict[str, tuple[float, object]] = {}
-_orm_lock = _asyncio.Lock()
+_orm_lock = asyncio.Lock()
 _ORM_MISS = object()  # sentinel to distinguish cached None from cache miss
 
 

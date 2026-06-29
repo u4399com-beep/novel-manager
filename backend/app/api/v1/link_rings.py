@@ -36,7 +36,7 @@ async def get_ring(
 ):
     ring = await db.get(LinkRing, ring_id)
     if not ring:
-        raise HTTPException(404, "Link ring not found")
+        raise HTTPException(status_code=404, detail="Link ring not found")
     return ring
 
 
@@ -47,7 +47,7 @@ async def create_link_ring(
     current_user: User = Depends(get_current_user),
 ):
     if "name" not in data:
-        raise HTTPException(400, "Missing required field: name")
+        raise HTTPException(status_code=400, detail="Missing required field: name")
     # Normalize: empty string site_id → None (global ring)
     if data.get("site_id") == "":
         data["site_id"] = None
@@ -66,7 +66,7 @@ async def update_link_ring(
 ):
     ring = await db.get(LinkRing, ring_id)
     if not ring:
-        raise HTTPException(404, "Link ring not found")
+        raise HTTPException(status_code=404, detail="Link ring not found")
     ring = await update_ring(db, ring, data)
     await db.commit()
     return ring
@@ -80,7 +80,7 @@ async def delete_link_ring(
 ):
     ring = await db.get(LinkRing, ring_id)
     if not ring:
-        raise HTTPException(404, "Link ring not found")
+        raise HTTPException(status_code=404, detail="Link ring not found")
     await delete_ring(db, ring)
     await db.commit()
 
@@ -109,7 +109,7 @@ async def add_target(
 ):
     ring = await db.get(LinkRing, ring_id)
     if not ring:
-        raise HTTPException(404, "Link ring not found")
+        raise HTTPException(status_code=404, detail="Link ring not found")
 
     max_sort = (await db.execute(
         select(func.max(LinkRingTarget.sort_order)).where(LinkRingTarget.ring_id == ring_id)
@@ -142,7 +142,7 @@ async def update_target(
 ):
     target = await db.get(LinkRingTarget, target_id)
     if not target or target.ring_id != ring_id:
-        raise HTTPException(404, "Target not found")
+        raise HTTPException(status_code=404, detail="Target not found")
     for k in ("source_site_id", "source_novel_id", "target_site_id",
               "target_novel_id", "target_url", "anchor_text", "sort_order", "is_active"):
         if k in data:
@@ -161,6 +161,6 @@ async def delete_target(
 ):
     target = await db.get(LinkRingTarget, target_id)
     if not target or target.ring_id != ring_id:
-        raise HTTPException(404, "Target not found")
+        raise HTTPException(status_code=404, detail="Target not found")
     await db.delete(target)
     await db.flush()
