@@ -84,6 +84,21 @@ def start_runner():
         return False
 
 
+async def _release_orphaned_lock():
+    """Release any orphaned DB queue lock before restarting the runner."""
+    try:
+        from app.database import async_session_factory
+        from sqlalchemy import text
+        async with async_session_factory() as db:
+            await db.execute(text(
+                "UPDATE system_state SET `value`=NULL, locked_at=NULL, worker_pid=NULL"
+            ))
+            await db.commit()
+            log.info("Orphaned DB lock released")
+    except Exception as e:
+        log.warning(f"Failed to release orphaned lock: {e}")
+
+
 async def reset_stuck_tasks():
     """Reset tasks stuck in 'running' state for too long."""
     from app.database import async_session_factory
@@ -216,6 +231,8 @@ async def watchdog_cycle():
         # Kill existing runner first
         subprocess.run(["pkill", "-9", "-f", "queue_runner.py"], capture_output=True)
         await asyncio.sleep(1)
+        # Release orphaned DB lock (prevents "another processor holds lock")
+        await _release_orphaned_lock()
         start_runner()
 
 
