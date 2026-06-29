@@ -139,7 +139,7 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
 
 # ── Unified TTL cache (reusable, async-safe, bounded) ──
 from app.services.cache_util import site_cache as _orm_cache
-_ORM_MISS = object()  # sentinel
+_ORM_MISS = _orm_cache._miss  # use cache's own sentinel
 
 
 async def _get_site(request, db) -> Optional[Site]:
