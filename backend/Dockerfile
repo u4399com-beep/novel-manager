@@ -9,11 +9,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create static directory
-RUN mkdir -p static/covers
+# Create static directory and switch to non-root user
+RUN mkdir -p static/covers data/content && \
+    useradd -m -u 1000 novel && chown -R novel:novel /app
+USER novel
 
 # Expose port
 EXPOSE 8000
 
-# Run with uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Run with gunicorn (production) — no --reload
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-c", "gunicorn.conf.py", "app.main:app"]

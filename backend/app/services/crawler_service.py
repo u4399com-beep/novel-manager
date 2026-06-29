@@ -99,7 +99,7 @@ def _parse_catalog(html: str) -> tuple[list[str], list[dict]]:
         if href:
             chapters.append({
                 "idx": idx, "title": a.get("title", "") or a.get_text(strip=True),
-                "url": urljoin("https://www.23qb.net", href),
+                "url": urljoin("https://www.23qb.net", href) if href.startswith("/") else href,
                 "volume": vol_map[idx] if idx < len(vol_map) else "",
             })
     return volumes, chapters
@@ -291,8 +291,8 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                 crawler._fetch = orig_fetch  # type: ignore
 
     except Exception as exc:
-        task.status = "failed"; task.error_message = str(exc)[:500]; task.finished_at = datetime.now(timezone.utc)
-        session.emit(CrawlEvent("error", message=str(exc)[:300]))
+        task.status = "failed"; task.error_message = type(exc).__name__ + ": " + str(exc)[:480]; task.finished_at = datetime.now(timezone.utc)
+        session.emit(CrawlEvent("error", message=type(exc).__name__ + ": " + str(exc)[:280]))
         await db.flush()   # persist error state BEFORE rollback expunges objects
         await db.rollback()  # roll back chapter inserts only
     finally:

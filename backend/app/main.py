@@ -30,6 +30,11 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(start_write_behind_worker(interval=30))
     except Exception:
         pass
+    try:
+        from app.services.crawl_session import _start_session_cleanup
+        asyncio.create_task(_start_session_cleanup(interval=600))
+    except Exception:
+        pass
     yield
     from app.database import engine
     await engine.dispose()
@@ -74,6 +79,16 @@ def create_app() -> FastAPI:
 
     # Rate limiting (100 req/60s per IP on API routes)
     app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
+
+    # Security headers
+    @app.middleware("http")
+    async def _security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
 
     # CORS
     app.add_middleware(
