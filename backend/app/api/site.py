@@ -116,7 +116,7 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
                     if result:
                         _t_cache[cache_key] = result
                         return result
-            except:
+            except Exception:
                 pass
             return text
         env.filters["translate"] = _translate_filter

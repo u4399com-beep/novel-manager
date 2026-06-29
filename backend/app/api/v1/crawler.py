@@ -799,8 +799,8 @@ async def queue_start_tasks(
     async def _process_queue():
         global _queue_running
         try:
-            async with async_session_factory() as db:
-                while True:
+            while True:
+                async with async_session_factory() as db:  # fresh session per iteration
                     tasks_result = await db.execute(
                         select(CrawlerTaskModel).where(CrawlerTaskModel.status == "pending")
                         .order_by(CrawlerTaskModel.created_at).limit(1)
@@ -810,17 +810,11 @@ async def queue_start_tasks(
                         break
                     try:
                         await crawler_service.run_crawl(db, str(task.id), mode="direct")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        _queue_log.warning(f"Queue task failed: {e}")
         finally:
             _queue_running = False
 
-    # Count pending
-    count_result = await db.execute(
-        select(func.count()).select_from(
-            select(CrawlerTaskModel).where(CrawlerTaskModel.status == "pending").subquery()
-        )
-    ) if False else None
     # Quick count
     from app.database import async_session_factory as asf
     async with asf() as s:

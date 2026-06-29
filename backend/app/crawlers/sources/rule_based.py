@@ -86,12 +86,17 @@ class RuleBasedCrawler(BaseCrawler):
     # Core helpers
     # ------------------------------------------------------------------
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._cached_rule: Optional[dict] = None
+
     def _rule(self):
-        """Load the rule file for this crawler's source_name."""
-        rule = load_rule(self.source_name)
-        if not rule:
+        """Load the rule file (cached after first read)."""
+        if self._cached_rule is None:
+            self._cached_rule = load_rule(self.source_name)
+        if not self._cached_rule:
             raise ValueError(f"Rule '{self.source_name}' not found in rules/")
-        return rule
+        return self._cached_rule
 
     def _section(self, name: str):
         """Get a section's selectors from the rule."""
