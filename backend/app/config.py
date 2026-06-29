@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api/v1"
 
     # Crawler
-    CRAWLER_REQUEST_DELAY: float = 1.0
+    CRAWLER_REQUEST_DELAY: float = 0.2
     CRAWLER_TIMEOUT: int = 60
     CRAWLER_CONCURRENCY: int = 10
 

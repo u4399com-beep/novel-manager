@@ -128,7 +128,12 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
 
             try:
                 # --- Novel metadata (cover + description) ---
-                if novel.source_url:
+                # Skip if already complete (has cover, author, description)
+                has_full_info = (
+                    novel.cover_image_url and novel.author and novel.description
+                    and not novel.author.startswith("Book-")
+                )
+                if novel.source_url and not has_full_info:
                     try:
                         info = await crawler.get_novel_info(novel.source_url)
                         # Update title if it's a placeholder (Book-XXXX / Chapter-XXXX)
@@ -202,7 +207,7 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                     await db.flush(); await db.commit(); remove_session(task_id); return task
 
                 # --- Phase 2: Concurrent chapter fetch ---
-                CONCURRENCY = 25; sem = asyncio.Semaphore(CONCURRENCY)
+                CONCURRENCY = 50; sem = asyncio.Semaphore(CONCURRENCY)
                 data = [{} for _ in range(len(new_chapters))]; done = 0; lock = asyncio.Lock()
                 rule = load_rule(source_name); cleaner_cfg = rule.get("cleaner", {}) if rule else {}
                 session.emit(CrawlEvent("progress", phase="fetch", total=len(new_chapters),

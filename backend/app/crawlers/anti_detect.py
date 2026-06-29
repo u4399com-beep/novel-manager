@@ -135,8 +135,8 @@ class AntiDetectClient:
 
     def __init__(
         self,
-        min_delay: float = 0.5,
-        max_delay: float = 3.0,
+        min_delay: float = 0.05,
+        max_delay: float = 0.3,
         max_retries: int = 4,
         timeout: float = 60.0,
         proxies: Optional[list[str]] = None,
