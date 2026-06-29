@@ -246,6 +246,7 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                                 nonlocal done; done += 1
                                 if cleaner_cfg.get("enabled") and content:
                                     content = clean_chapter(content, remove_lines=cleaner_cfg.get("remove_lines"), inline_remove=cleaner_cfg.get("inline_remove"))
+                                    data[ch["idx"]]["content"] = content  # persist cleaned content
                                 elapsed = time.monotonic() - start_time
                                 spd = done / elapsed if elapsed > 0 else 0
                                 if done % max(1, len(new_chapters) // 20) == 0 or done <= 3:
@@ -274,6 +275,7 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
     except Exception as exc:
         task.status = "failed"; task.error_message = str(exc)[:500]; task.finished_at = datetime.now(timezone.utc)
         session.emit(CrawlEvent("error", message=str(exc)[:300]))
+        await db.rollback()  # discard partial inserts from failed crawl
     finally:
         await session.close()
 

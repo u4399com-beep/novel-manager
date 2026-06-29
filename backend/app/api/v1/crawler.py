@@ -604,6 +604,14 @@ async def repair_placeholder_titles(
 _queue_log = logging.getLogger("crawler.queue")
 
 
+def start_queue():
+    """Restart the background queue processor."""
+    global _queue_running
+    if not _queue_running:
+        _queue_running = True
+        asyncio.ensure_future(_queue_worker())
+
+
 async def _queue_worker():
     """Robust queue processor with built-in watchdog."""
     global _queue_running
@@ -864,6 +872,7 @@ async def retry_task(
     return task
 
 
+@router.post("/tasks/batch-delete", status_code=200)
 async def batch_delete_tasks(
     data: dict,
     db: AsyncSession = Depends(get_db),

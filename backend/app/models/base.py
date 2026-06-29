@@ -46,10 +46,6 @@ class TimestampMixin:
 # ---- Auto-update updated_at on every ORM flush ----
 @event.listens_for(Base, "before_update", propagate=True)
 def _touch_updated_at(mapper, connection, target):
-    """Bump updated_at to now() before every UPDATE.
-
-    Using a mapper event is the most portable way to auto-update
-    timestamps — it works identically on MySQL, SQLite, and Postgres
-    without relying on database-specific ON UPDATE triggers.
-    """
-    target.updated_at = datetime.now(timezone.utc)
+    """Bump updated_at to now() before every UPDATE."""
+    if hasattr(target, "updated_at"):
+        target.updated_at = datetime.now(timezone.utc)

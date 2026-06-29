@@ -17,7 +17,7 @@ class User(Base, TimestampMixin):
         String(255), nullable=False
     )
     role: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="admin"
+        String(16), nullable=False, default="user"
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True

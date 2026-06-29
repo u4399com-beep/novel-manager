@@ -42,7 +42,7 @@ class CrawlSession:
     def __init__(self, task_id: str, novel_title: str = ""):
         self.task_id = task_id
         self.novel_title = novel_title
-        self.queue: asyncio.Queue[CrawlEvent] = asyncio.Queue()
+        self.queue: asyncio.Queue[CrawlEvent] = asyncio.Queue(maxsize=500)
         self.started_at: float = time.monotonic()
         self.chapter_index: int = 0
         self.chapter_total: int = 0

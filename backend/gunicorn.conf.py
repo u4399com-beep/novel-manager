@@ -32,25 +32,20 @@ max_requests = 5000       # Restart worker after 5k requests (prevent leaks)
 max_requests_jitter = 500  # Randomize restart timing
 
 # ---- Preload ----
-preload_app = True  # Load app once before forking (saves memory)
+preload_app = False  # Don't preload — avoids DB connections shared across fork
 
 
-def on_starting(server):
-    """Warm up the DB pool before accepting requests."""
+def post_fork(server, worker):
+    """Called after each worker forks — warm up this worker's DB pool."""
     import asyncio
     loop = asyncio.new_event_loop()
 
     async def warmup():
         from app.database import warmup_pool
         await warmup_pool()
-        server.log.info("DB connection pool warmed up")
+        server.log.info(f"Worker {worker.pid} DB pool warmed up")
 
     loop.run_until_complete(warmup())
-
-
-def post_fork(server, worker):
-    """Called after each worker forks."""
-    server.log.info(f"Worker {worker.pid} started")
 
 
 def worker_exit(server, worker):

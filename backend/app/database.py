@@ -13,8 +13,10 @@ if _is_mysql:
     # 8 workers × (12+6) = 144 < 151 (safe)
     import os as _os
     _workers = int(_os.getenv("GUNICORN_WORKERS", _os.getenv("UVICORN_WORKERS", "4")))
-    _pool_per_worker = max(8, min(50, 120 // max(_workers, 1)))
-    _overflow_per_worker = max(4, _pool_per_worker // 2)
+    # Target: total connections <= 144 (safe under MySQL default max_connections=151)
+    _max_total = 144
+    _pool_per_worker = max(6, min(30, _max_total // max(_workers, 1) - 4))
+    _overflow_per_worker = max(2, _pool_per_worker // 4)
     _kwargs.update(
         pool_size=_pool_per_worker,
         max_overflow=_overflow_per_worker,
@@ -25,12 +27,15 @@ elif _is_sqlite:
     _kwargs["connect_args"] = {"timeout": 20}
 
 # Retry on connection failure
+engine = None
 for _ in range(3):
     try:
         engine = create_async_engine(settings.DATABASE_URL, **_kwargs)
         break
     except Exception:
-        import asyncio, time; time.sleep(1)
+        import time; time.sleep(1)
+else:
+    raise RuntimeError("Failed to create database engine after 3 retries")
 
 if _is_sqlite:
     @event.listens_for(engine.sync_engine, "connect")

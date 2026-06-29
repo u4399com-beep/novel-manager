@@ -20,12 +20,16 @@ LANGUAGES = {
 
 def load_translations(lang: str) -> dict:
     """Load translation dict for *lang*, falling back to Chinese."""
+    # Validate: only allow known language codes (prevents path traversal)
+    if lang not in LANGUAGES and lang not in ("zh-TW",):
+        lang = "zh"
+
     if lang in _cache:
         return _cache[lang]
 
     path = os.path.join(I18N_DIR, f"{lang}.json")
     if not os.path.isfile(path):
-        path = os.path.join(I18N_DIR, "zh.json")  # fallback
+        path = os.path.join(I18N_DIR, "zh.json")
 
     try:
         with open(path, "r", encoding="utf-8") as f:

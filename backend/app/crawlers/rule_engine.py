@@ -66,8 +66,13 @@ def list_rules() -> list[dict[str, Any]]:
     return rules
 
 
+_SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
 def load_rule(source_name: str) -> Optional[dict[str, Any]]:
     """Load a single rule file by source_name."""
+    if not _SAFE_NAME_RE.match(source_name):
+        return None  # reject path-traversal attempts
     filepath = RULES_DIR / f"{source_name}.json"
     if not filepath.is_file():
         return None
