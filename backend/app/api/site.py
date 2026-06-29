@@ -135,32 +135,9 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
     return _tpl_cache[site_template]
 
 
-# Site context helper
-# ── In-process TTL cache for ORM objects (avoids Redis serialization) ──
-_orm_cache: dict[str, tuple[float, object]] = {}
-_orm_cache_max = 1000  # bound to prevent memory leak under host-header attacks
-_orm_lock = asyncio.Lock()
-_ORM_MISS = object()  # sentinel to distinguish cached None from cache miss
-
-
-async def _cached_orm(key: str, ttl: int):
-    """Check in-process TTL cache for ORM objects (async, lock-guarded)."""
-    import time
-    now = time.monotonic()
-    async with _orm_lock:
-        if key in _orm_cache:
-            expiry, val = _orm_cache[key]
-            if now < expiry:
-                return val if val is not _ORM_MISS else None
-    return _ORM_MISS  # signal miss — caller must compute and store
-
-
-async def _set_orm_cache(key: str, val: object, ttl: int):
-    import time
-    async with _orm_lock:
-        if len(_orm_cache) >= _orm_cache_max:
-            _orm_cache.pop(next(iter(_orm_cache)))  # evict oldest
-        _orm_cache[key] = (time.monotonic() + ttl, val)
+# ── Unified TTL cache (reusable, async-safe, bounded) ──
+from app.services.cache_util import site_cache as _orm_cache
+_ORM_MISS = object()  # sentinel
 
 
 async def _get_site(request, db) -> Optional[Site]:
@@ -168,7 +145,7 @@ async def _get_site(request, db) -> Optional[Site]:
     host = request.headers.get("host", "").split(":")[0]
     cache_key = f"site:{host}"
 
-    cached = await _cached_orm(cache_key, ttl=30)
+    cached = await _orm_cache.get(cache_key)
     if cached is not _ORM_MISS:
         return cached
 
@@ -176,7 +153,7 @@ async def _get_site(request, db) -> Optional[Site]:
         select(Site).where(Site.domain == host, Site.is_active == True)
     )
     site = result.scalars().first()
-    await _set_orm_cache(cache_key, site if site is not None else _ORM_MISS, ttl=60)
+    await _orm_cache.set(cache_key, site if site is not None else _ORM_MISS, ttl=60)
     return site
 
 
@@ -187,7 +164,7 @@ async def _get_categories(db) -> list:
     cats = (await db.execute(
         select(Category).order_by(Category.sort_order)
     )).scalars().all()
-    await _set_orm_cache(cache_key, cats, ttl=1)
+    await _orm_cache.set(cache_key, cats, ttl=300)
     return cats
 
 

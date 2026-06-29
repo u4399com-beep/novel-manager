@@ -11,34 +11,28 @@ from app.schemas.category import CategoryCreate, CategoryRead, CategoryUpdate
 router = APIRouter()
 
 
-# ── In-process TTL cache for ORM objects ──
-_orm_cache: dict[str, tuple[float, object]] = {}
+from app.services.cache_util import categories_cache as _cat_cache
 
 
 @router.get("", response_model=list[CategoryRead])
 async def list_categories(db: AsyncSession = Depends(get_db)):
     """List all categories, ordered by sort_order (cached 5 min)."""
-    import time
-    cache_key = "all_categories_api"
-    now = time.monotonic()
-    if cache_key in _orm_cache:
-        expiry, val = _orm_cache[cache_key]
-        if now < expiry:
-            return val
+    cached = await _cat_cache.get("all")
+    if cached is not _cat_cache._miss:
+        return cached
 
     result = await db.execute(
         select(Category).order_by(Category.sort_order.asc())
     )
     cats = result.scalars().all()
-    # Cache as Pydantic models to avoid DetachedInstanceError
     validated = [CategoryRead.model_validate(c) for c in cats]
-    _orm_cache[cache_key] = (now + 300, validated)
+    await _cat_cache.set("all", validated, ttl=300)
     return validated
 
 
 async def _invalidate_category_cache():
     """Invalidate cached category queries after mutation."""
-    _orm_cache.pop("all_categories_api", None)
+    await _cat_cache.invalidate("all")
     from app.services.redis_cache import delete_pattern
     await delete_pattern("query", "*categories*")
 
