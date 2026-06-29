@@ -71,7 +71,7 @@ async def start_repair_chapters(current_user: User = Depends(get_current_user)):
     script = os.path.join(BACKEND_DIR, "repair_empty_chapters.py")
     p = subprocess.Popen(
         [sys.executable, script],
-        stdout=open("/tmp/repair_chapters.log", "a"), stderr=subprocess.STDOUT,
+        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
         cwd=BACKEND_DIR,
     )
     _repair_tasks["chapters"] = p
@@ -97,7 +97,7 @@ async def start_repair_covers(current_user: User = Depends(get_current_user)):
     script = os.path.join(BACKEND_DIR, "repair_covers.py")
     p = subprocess.Popen(
         [sys.executable, script],
-        stdout=open("/tmp/repair_covers.log", "a"), stderr=subprocess.STDOUT,
+        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
         cwd=BACKEND_DIR,
     )
     _repair_tasks["covers"] = p

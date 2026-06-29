@@ -76,7 +76,7 @@ async def restart_queue(current_user: User = Depends(get_current_user)):
         subprocess.run(["pkill", "-9", "-f", "queue_runner.py"], capture_output=True)
         subprocess.Popen(
             [sys.executable, QUEUE_SCRIPT, "--concurrent", "8"],
-            stdout=open("/tmp/queue_runner.log", "a"),
+            stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
             cwd=os.path.dirname(QUEUE_SCRIPT),
         )
@@ -94,7 +94,7 @@ async def restart_watchdog(current_user: User = Depends(get_current_user)):
         watchdog_script = os.path.join(os.path.dirname(QUEUE_SCRIPT), "queue_watchdog.py")
         subprocess.Popen(
             [sys.executable, watchdog_script],
-            stdout=open("/tmp/watchdog.log", "a"),
+            stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
             cwd=os.path.dirname(QUEUE_SCRIPT),
         )

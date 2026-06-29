@@ -789,8 +789,9 @@ async def batch_start_tasks(
     return {"started": started, "failed": failed}
 
 
-# Global queue state
+# Global queue state (lock-guarded for multi-worker safety)
 _queue_running = False
+_queue_lock = asyncio.Lock()
 
 @router.post("/tasks/queue-start", status_code=200)
 async def queue_start_tasks(
