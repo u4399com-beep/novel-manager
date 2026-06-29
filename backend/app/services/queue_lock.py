@@ -31,14 +31,16 @@ async def acquire_queue_lock(lock_key: str = "queue_processor", ttl: int = 120) 
                 INSERT INTO system_state (`key`, `value`, `worker_pid`, `locked_at`, `lock_ttl`)
                 VALUES (:key, 'locked', :pid, :now, :ttl)
                 ON DUPLICATE KEY UPDATE
-                    `value` = IF(`locked_at` IS NULL OR
+                    `value` = IF(`value` IS NULL OR `locked_at` IS NULL OR
                         TIMESTAMPDIFF(SECOND, `locked_at`, :now) > `lock_ttl`,
                         'locked', `value`),
-                    `worker_pid` = IF(`value` = 'locked' AND
-                        TIMESTAMPDIFF(SECOND, `locked_at`, :now) > `lock_ttl`,
+                    `worker_pid` = IF(`value` IS NULL OR `locked_at` IS NULL OR
+                        (`value` = 'locked' AND
+                         TIMESTAMPDIFF(SECOND, `locked_at`, :now) > `lock_ttl`),
                         :pid, `worker_pid`),
-                    `locked_at` = IF(`value` = 'locked' AND
-                        TIMESTAMPDIFF(SECOND, `locked_at`, :now) > `lock_ttl`,
+                    `locked_at` = IF(`value` IS NULL OR `locked_at` IS NULL OR
+                        (`value` = 'locked' AND
+                         TIMESTAMPDIFF(SECOND, `locked_at`, :now) > `lock_ttl`),
                         :now, `locked_at`)
             """), {"key": lock_key, "pid": pid, "now": now, "ttl": ttl})
             await db.commit()
