@@ -352,6 +352,7 @@ async def trigger_page_crawl(
                                         saved = await save_cover_image(nv, resp.content, fn)
                                         nv.cover_image_url = saved
                                         await s.flush()
+                                        await s.commit()
                     except Exception as e:
                         _queue_log.debug(f"Cover download failed: {e}")
                 cover_task = asyncio.create_task(_download_cover(str(novel.id), cover_url))
