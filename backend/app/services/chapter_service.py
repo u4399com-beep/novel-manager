@@ -132,9 +132,15 @@ async def update_chapter(
         if value is not None:
             setattr(chapter, field, value)
 
-    # Recompute word count if content changed
-    if "content" in update_data:
+    # Recompute word count and persist content to file store if changed
+    if "content" in update_data and update_data["content"] is not None:
         chapter.word_count = count_words(chapter.content)
+        # Write to compressed file store (deprecates DB content column)
+        new_path = await content_store.awrite_content(
+            chapter.novel_id, str(chapter.id), update_data["content"]
+        )
+        if new_path:
+            chapter.content_file = new_path
 
     await db.flush()
     await db.refresh(chapter)

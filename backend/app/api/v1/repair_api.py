@@ -14,7 +14,11 @@ _repair_tasks: dict[str, subprocess.Popen] = {}
 
 def _is_running(name: str) -> bool:
     p = _repair_tasks.get(name)
-    return p is not None and p.poll() is None
+    if p is None:
+        return False
+    if p is True:  # async task marker (info repair)
+        return True
+    return p.poll() is None
 
 
 @router.get("/status")
@@ -154,23 +158,16 @@ async def start_repair_info(batch_size: int = 100, current_user: User = Depends(
                 await db.commit()
             log_inner.info(f"Fixed {fixed}/{len(novels)} novel info")
 
+    _repair_tasks["info"] = True  # running flag
     asyncio.create_task(repair())
-    # Use a dummy completed process to mark as running
-    _repair_tasks["info"] = subprocess.Popen(["echo", "running"])
     return {"message": f"Novel info repair started ({batch_size} books)", "success": True}
 
 
 @router.post("/info/stop")
 async def stop_repair_info(current_user: User = Depends(get_current_user)):
-    """Stop info repair."""
-    p = _repair_tasks.get("info")
-    if p and p.poll() is None:
-        p.terminate()
-        del _repair_tasks["info"]
-        return {"message": "Stopped", "success": True}
-    if "info" in _repair_tasks:
-        del _repair_tasks["info"]
-    return {"message": "Not running", "success": False}
+    """Stop info repair (mark as cancelled)."""
+    was_running = _repair_tasks.pop("info", None) is not None
+    return {"message": "Stopped" if was_running else "Not running", "success": was_running}
 
 
 @router.get("/logs/{task}")

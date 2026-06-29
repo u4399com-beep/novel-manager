@@ -96,8 +96,8 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
         loader = FileSystemLoader(existing)
         env = Environment(loader=loader, autoescape=True)
 
-        # Add translation filter
-        _t_cache = {}
+        # Add translation filter (bounded cache, max 1000 entries)
+        _t_cache: dict[str, str] = {}
         def _translate_filter(text, target_lang):
             if text is None:
                 return ""
@@ -114,6 +114,8 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
                 if resp.status_code == 200:
                     result = resp.json()["translatedText"]
                     if result:
+                        if len(_t_cache) > 1000:
+                            _t_cache.pop(next(iter(_t_cache)))  # evict oldest
                         _t_cache[cache_key] = result
                         return result
             except Exception:

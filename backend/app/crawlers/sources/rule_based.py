@@ -81,6 +81,17 @@ class RuleBasedCrawler(BaseCrawler):
         rule = self._rule()
         return rule.get("selectors", {}).get(name, {})
 
+    @property
+    def client(self) -> httpx.AsyncClient:
+        """Lazy-init httpx client — same pattern as TwentyThreeQbCrawler."""
+        if self._client is None:
+            self._client = httpx.AsyncClient(
+                timeout=settings.CRAWLER_TIMEOUT,
+                headers=HEADERS,
+                follow_redirects=True,
+            )
+        return self._client
+
     async def _fetch(self, url: str) -> str:
         await asyncio.sleep(settings.CRAWLER_REQUEST_DELAY)
         resp = await self.client.get(url)

@@ -18,6 +18,17 @@ async def lifespan(app: FastAPI):
         os.makedirs(os.path.join(settings.STATIC_DIR, "covers"), exist_ok=True)
     except OSError:
         pass
+    # Warm up Redis connection pool + start write-behind worker
+    try:
+        from app.services.redis_cache import _get_redis
+        await _get_redis()
+    except Exception:
+        pass
+    try:
+        from app.services.write_behind_cache import start_write_behind_worker
+        asyncio.create_task(start_write_behind_worker(interval=30))
+    except Exception:
+        pass
     yield
     from app.database import engine
     await engine.dispose()

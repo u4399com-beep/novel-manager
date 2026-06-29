@@ -171,7 +171,8 @@ async def get_or_compute(
         return None
 
     result = await compute()
-    if result is not None:
+    # Cache all truthy results plus explicitly non-None falsy values (0, "", [])
+    if result is not None and result != "":
         await set(namespace, str(result) if not isinstance(result, str) else result, *parts, ttl=ttl)
     return result
 

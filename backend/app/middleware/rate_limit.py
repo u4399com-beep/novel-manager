@@ -65,10 +65,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
             bucket.append(now)
 
-            # Periodic cleanup: remove empty buckets to prevent memory leak
+            # Periodic cleanup: remove empty AND fully-expired buckets
             if len(self._buckets) > 10000:
-                empty = [ip for ip, b in self._buckets.items() if not b]
-                for ip in empty:
+                stale = [
+                    ip for ip, b in self._buckets.items()
+                    if not b or all(t <= cutoff for t in b)
+                ]
+                for ip in stale:
                     del self._buckets[ip]
 
         return await call_next(request)
