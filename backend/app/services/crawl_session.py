@@ -17,6 +17,7 @@ from typing import Optional
 
 class CrawlEvent:
     """A single progress event emitted during a crawl."""
+    __slots__ = ("timestamp", "type", "data")
 
     def __init__(self, event_type: str, **kwargs):
         self.timestamp = datetime.now(timezone.utc).isoformat()

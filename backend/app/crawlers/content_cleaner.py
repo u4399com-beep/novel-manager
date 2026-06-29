@@ -42,6 +42,10 @@ BUILTIN_INLINE_REMOVE = [
     r"（温馨提示[^）]*）",
 ]
 
+# Precompiled patterns (built-in only — custom patterns are compiled ad-hoc)
+_BUILTIN_LINE_RE = re.compile("|".join(f"({p})" for p in BUILTIN_REMOVE_LINES)) if BUILTIN_REMOVE_LINES else None
+_BUILTIN_INLINE_RE = re.compile("|".join(f"({p})" for p in BUILTIN_INLINE_REMOVE)) if BUILTIN_INLINE_REMOVE else None
+
 
 def clean_content(
     text: str,
@@ -74,13 +78,17 @@ def clean_content(
     if not text:
         return ""
 
-    # Merge built-in + custom patterns
-    line_patterns = list(BUILTIN_REMOVE_LINES) + (remove_lines or [])
-    inline_patterns = list(BUILTIN_INLINE_REMOVE) + (inline_remove or [])
-
-    # Pre-compile
-    line_re = re.compile("|".join(f"({p})" for p in line_patterns)) if line_patterns else None
-    inline_re = re.compile("|".join(f"({p})" for p in inline_patterns)) if inline_patterns else None
+    # Use precompiled built-in patterns; recompile only when custom patterns added
+    if remove_lines:
+        line_patterns = list(BUILTIN_REMOVE_LINES) + remove_lines
+        line_re = re.compile("|".join(f"({p})" for p in line_patterns))
+    else:
+        line_re = _BUILTIN_LINE_RE
+    if inline_remove:
+        inline_patterns = list(BUILTIN_INLINE_REMOVE) + inline_remove
+        inline_re = re.compile("|".join(f"({p})" for p in inline_patterns))
+    else:
+        inline_re = _BUILTIN_INLINE_RE
 
     lines = text.split("\n")
     cleaned: list[str] = []

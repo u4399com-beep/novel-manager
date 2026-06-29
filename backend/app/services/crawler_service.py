@@ -239,8 +239,8 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                                         raw = _clean_text(cd.get_text())
                                         if raw: paras = [raw]
                                     content = "\n\n".join(paras)
-                            except Exception as exc:
-                                import logging; logging.getLogger("crawler").debug("Chapter fetch failed: %s", exc)
+                            except Exception:
+                                pass  # individual chapter fetch failure is non-fatal
                             # Clean chapter title — reject garbage
                             chapter_title = clean_chapter_title(ch["title"])
                             if not chapter_title:

@@ -27,7 +27,7 @@ from app.models.novel import Novel
 from app.models.site import Site
 from app.services.chapter_service import get_chapter_content
 from app.services.link_wheel_service import resolve_links_for_page
-from app.i18n import t as i18n_t, load_translations, get_language_list
+from app.i18n import t as i18n_t, LANGUAGES, load_translations, get_language_list
 from app.services.translator import translate_text as tr_content
 
 # ---------------------------------------------------------------------------
@@ -202,15 +202,33 @@ def _site_context(site: Optional[Site], **extra) -> dict:
     return {
         "lang": lang,
         "T": lambda key, **kw: i18n_t(lang, key, **kw),
-        "lang_name": {"zh":"中文","en":"English","ja":"日本語","ko":"한국어","fr":"Français","de":"Deutsch","es":"Español","pt":"Português","ru":"Русский","ar":"العربية","th":"ภาษาไทย","vi":"Tiếng Việt","id":"Bahasa Indonesia","it":"Italiano","tr":"Türkçe","hi":"हिन्दी","fa":"فارسی","cs":"Čeština","da":"Dansk","nl":"Nederlands","fi":"Suomi","el":"Ελληνικά","he":"עברית","hu":"Magyar","ga":"Gaeilge","pl":"Polski","sk":"Slovenčina","sv":"Svenska","uk":"Українська","az":"Azərbaycan"}.get(lang, "中文"),
+        "lang_name": LANGUAGES.get(lang, "中文"),
         "target_lang": lang,
         **extra,
     }
 
 
 async def _tr_content(db, novel, chapter, cats, lang: str):
-    """Translate content. Disabled: Google Translate blocked by firewall."""
-    return  # no-op stub — re-enable when firewall allows
+    """Translate content via LibreTranslate local API."""
+    if lang in ("zh", "zh-TW", ""):
+        return
+    try:
+        if novel:
+            if novel.title and any('一' <= c <= '鿿' for c in novel.title):
+                novel.title = await tr_content(db, novel.title, lang)
+            if novel.author and any('一' <= c <= '鿿' for c in novel.author):
+                novel.author = await tr_content(db, novel.author, lang)
+            if novel.description and any('一' <= c <= '鿿' for c in (novel.description or "")):
+                novel.description = await tr_content(db, novel.description[:1000], lang)
+        if chapter:
+            if chapter.title and any('一' <= c <= '鿿' for c in chapter.title):
+                chapter.title = await tr_content(db, chapter.title, lang)
+        if cats:
+            for cat in cats:
+                if cat.name and any('一' <= c <= '鿿' for c in cat.name):
+                    cat.name = await tr_content(db, cat.name, lang)
+    except Exception as exc:
+        import logging; logging.getLogger("site").warning("_tr_content: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -867,6 +885,16 @@ async def site_novels(
     cats = await _get_categories(db)
     lang = site.language if site and site.language else "zh"
     await _tr_content(db, None, None, cats, lang)
+    # Translate all novels shown on the page
+    all_page_novels = set()
+    for n in (novels or []): all_page_novels.add(n)
+    for n in (featured or []): all_page_novels.add(n)
+    for n in (latest or []): all_page_novels.add(n)
+    for n in (ranking or []): all_page_novels.add(n)
+    for cn_list in (category_novels or {}).values():
+        for n in cn_list: all_page_novels.add(n)
+    for n in all_page_novels:
+        await _tr_content(db, n, None, None, lang)
 
     # ---- Link wheel links ----
     link_wheel_links = await _safe_link_wheel(site, db, None, "home")
