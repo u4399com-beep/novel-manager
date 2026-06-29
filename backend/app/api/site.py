@@ -115,8 +115,9 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
             if cache_key in _t_cache:
                 return _t_cache[cache_key]
             try:
+                from app.config import settings
                 import httpx
-                resp = httpx.post("http://localhost:5001/translate", json={
+                resp = httpx.post(settings.LIBRETRANSLATE_URL, json={
                     "q": text, "source": "auto", "target": target_lang, "format": "text"
                 }, timeout=10)
                 if resp.status_code == 200:
@@ -137,6 +138,7 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
 # Site context helper
 # ── In-process TTL cache for ORM objects (avoids Redis serialization) ──
 _orm_cache: dict[str, tuple[float, object]] = {}
+_orm_cache_max = 1000  # bound to prevent memory leak under host-header attacks
 _orm_lock = asyncio.Lock()
 _ORM_MISS = object()  # sentinel to distinguish cached None from cache miss
 
@@ -156,6 +158,8 @@ async def _cached_orm(key: str, ttl: int):
 async def _set_orm_cache(key: str, val: object, ttl: int):
     import time
     async with _orm_lock:
+        if len(_orm_cache) >= _orm_cache_max:
+            _orm_cache.pop(next(iter(_orm_cache)))  # evict oldest
         _orm_cache[key] = (time.monotonic() + ttl, val)
 
 

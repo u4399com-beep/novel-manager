@@ -210,6 +210,9 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                     task.status = "completed"; task.finished_at = datetime.now(timezone.utc); task.error_message = None
                     await db.flush(); await db.commit(); remove_session(task_id); return task
 
+                # Commit Phase 1 metadata BEFORE risky chapter fetch
+                await db.commit()
+
                 # --- Phase 2: Concurrent chapter fetch ---
                 sem = asyncio.Semaphore(settings.CRAWLER_CONCURRENCY)
                 data = [{} for _ in range(len(new_chapters))]; done = 0; lock = asyncio.Lock()
@@ -240,7 +243,7 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                                         if raw: paras = [raw]
                                     content = "\n\n".join(paras)
                             except Exception:
-                                pass  # individual chapter fetch failure is non-fatal
+                                _session_stats["skipped"] = _session_stats.get("skipped", 0) + 1
                             # Clean chapter title — reject garbage
                             chapter_title = clean_chapter_title(ch["title"])
                             if not chapter_title:
@@ -279,7 +282,8 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
     except Exception as exc:
         task.status = "failed"; task.error_message = str(exc)[:500]; task.finished_at = datetime.now(timezone.utc)
         session.emit(CrawlEvent("error", message=str(exc)[:300]))
-        await db.rollback()  # discard partial inserts from failed crawl
+        # Rollback chapter inserts but preserve novel metadata (already committed at end of Phase 1)
+        await db.rollback()
     finally:
         await session.close()
 

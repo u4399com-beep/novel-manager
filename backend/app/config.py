@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     CRAWLER_TIMEOUT: int = 60
     CRAWLER_CONCURRENCY: int = 10
 
+    # Translation
+    LIBRETRANSLATE_URL: str = "http://localhost:5001/translate"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

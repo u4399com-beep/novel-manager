@@ -145,9 +145,9 @@ async def trigger_crawl(
     task = await crawler_service.create_crawler_task(db, data.novel_id, data.source_name)
     from app.services.crawl_session import create_session
     create_session(str(task.id), novel.title)
-    await db.flush()
-    # Run crawl in same session — most reliable
-    await crawler_service.run_crawl(db, str(task.id), mode=data.mode)
+    await db.commit()  # persist task before background execution
+    # Run crawl asynchronously — don't block the HTTP response
+    asyncio.create_task(_run_single_crawl(str(task.id), data.mode))
     return task
 
 
@@ -352,8 +352,8 @@ async def trigger_page_crawl(
                                         saved = await save_cover_image(nv, resp.content, fn)
                                         nv.cover_image_url = saved
                                         await s.flush()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        _queue_log.debug(f"Cover download failed: {e}")
                 cover_task = asyncio.create_task(_download_cover(str(novel.id), cover_url))
                 cover_task.add_done_callback(lambda t: _running_tasks.discard(t))
                 _running_tasks.add(cover_task)
@@ -601,6 +601,17 @@ async def repair_placeholder_titles(
 
 
 _queue_log = logging.getLogger("crawler.queue")
+
+
+async def _run_single_crawl(task_id: str, mode: str):
+    """Run a single crawl in its own DB session (background task)."""
+    from app.database import async_session_factory as _asf
+    from app.services import crawler_service as _cs
+    try:
+        async with _asf() as db:
+            await _cs.run_crawl(db, task_id, mode=mode)
+    except Exception:
+        _queue_log.warning(f"Background crawl {task_id[:12]}... failed")
 
 
 def start_queue():

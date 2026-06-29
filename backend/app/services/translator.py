@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.translation_cache import TranslationCache
 
 log = logging.getLogger("translator")
-LIBRETRANSLATE_URL = "http://localhost:5001/translate"
+from app.config import settings
+LIBRETRANSLATE_URL = settings.LIBRETRANSLATE_URL
 CHUNK_SIZE = 4000
 SKIP_PATTERN = re.compile(r"^[\d\s\.\,\-\+\=\:\;\/\\\[\]\{\}\(\)\@\#\$\%\^\&\*\_\~]+$")
 LANG_MAP = {
