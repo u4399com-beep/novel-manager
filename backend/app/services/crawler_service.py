@@ -49,6 +49,18 @@ async def list_crawler_tasks(db: AsyncSession, *, novel_id: Optional[str] = None
 # ---------------------------------------------------------------------------
 # Auto-match: search source site by novel title
 # ---------------------------------------------------------------------------
+def _score_match(result: dict, novel_title: str, novel_author: str) -> tuple[int, str]:
+    """Score a search result against a novel (shared between auto_match and preview)."""
+    score = 0
+    url = result.get("url", "")
+    if result.get("title") == novel_title: score += 50
+    elif novel_title in result.get("title", "") or result.get("title", "") in novel_title: score += 30
+    if novel_author and result.get("author"):
+        if novel_author == result.get("author"): score += 40
+        elif novel_author in result.get("author") or result.get("author") in novel_author: score += 20
+    return score, url
+
+
 async def auto_match_novel(novel: Novel, source_name: str) -> Optional[str]:
     c = get_crawler(source_name)
     if not c: return None
@@ -58,13 +70,8 @@ async def auto_match_novel(novel: Novel, source_name: str) -> Optional[str]:
         return None
     best_url, best_score = "", 0
     for r in results:
-        score = 0
-        if r.get("title") == novel.title: score += 50
-        elif novel.title in r.get("title", "") or r.get("title", "") in novel.title: score += 30
-        if novel.author and r.get("author"):
-            if novel.author == r.get("author"): score += 40
-            elif novel.author in r.get("author") or r.get("author") in novel.author: score += 20
-        if score > best_score: best_score, best_url = score, r.get("url", "")
+        score, url = _score_match(r, novel.title, novel.author or "")
+        if score > best_score: best_score, best_url = score, url
     return best_url if best_score >= 30 else None
 
 # ---------------------------------------------------------------------------
@@ -324,12 +331,7 @@ async def preview_search_match(db: AsyncSession, novel_id: str, source_name: str
     except Exception as exc: return {"error": f"Search failed: {exc}"}
     scored = []
     for r in results:
-        score = 0
-        if r.get("title") == novel.title: score += 50
-        elif novel.title in r.get("title", "") or r.get("title", "") in novel.title: score += 30
-        if novel.author and r.get("author"):
-            if novel.author == r.get("author"): score += 40
-            elif novel.author in r.get("author") or r.get("author") in novel.author: score += 20
+        score, _ = _score_match(r, novel.title, novel.author or "")
         r["_score"] = score; scored.append(r)
     scored.sort(key=lambda x: x["_score"], reverse=True)
     return {"novel_title": novel.title, "novel_author": novel.author, "source_name": source_name,
