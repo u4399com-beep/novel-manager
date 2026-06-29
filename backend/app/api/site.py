@@ -104,6 +104,8 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
         loader = FileSystemLoader(existing)
         env = Environment(loader=loader, autoescape=True)
 
+        import hashlib
+        _hash_text = lambda t: hashlib.sha256(t.encode()).hexdigest()[:16]
         # Add translation filter (bounded cache, max 1000 entries)
         _t_cache: dict[str, str] = {}
         def _translate_filter(text, target_lang):
@@ -111,7 +113,7 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
                 return ""
             if target_lang == "zh" or not text:
                 return text
-            cache_key = f"{hash(text)}:{target_lang}"
+            cache_key = f"{_hash_text(text)}:{target_lang}"
             if cache_key in _t_cache:
                 return _t_cache[cache_key]
             try:

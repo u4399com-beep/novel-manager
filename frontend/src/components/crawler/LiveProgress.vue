@@ -151,6 +151,8 @@ watch(() => props.taskId, (id) => {
   if (id) { disconnect(); connect() }
 })
 
-// Auto-connect on mount
+// Auto-connect on mount, disconnect on unmount
+import { onUnmounted } from 'vue'
 connect()
+onUnmounted(() => { disconnect() })
 </script>

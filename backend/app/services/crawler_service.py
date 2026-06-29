@@ -18,7 +18,11 @@ from app.models.crawler_task import CrawlerTask
 from app.models.novel import Novel
 from app.services.chapter_service import batch_create_chapters, count_words
 from app.services.crawl_session import CrawlEvent, create_session, get_session, remove_session
+from app.config import settings
 from app.services.novel_service import save_cover_image as save_cover
+
+# Initialize at module level (reset per crawl)
+_session_stats: dict = {}
 
 # ---------------------------------------------------------------------------
 # Task CRUD
@@ -218,7 +222,7 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                 data = [{} for _ in range(len(new_chapters))]; done = 0; lock = asyncio.Lock()
                 rule = load_rule(source_name); cleaner_cfg = rule.get("cleaner", {}) if rule else {}
                 session.emit(CrawlEvent("progress", phase="fetch", total=len(new_chapters),
-                                        message=f"并发采集 {len(new_chapters)} 章 ({CONCURRENCY}线程)"))
+                                        message=f"并发采集 {len(new_chapters)} 章 ({settings.CRAWLER_CONCURRENCY}线程)"))
 
                 async with httpx.AsyncClient(
                     timeout=30, follow_redirects=True,

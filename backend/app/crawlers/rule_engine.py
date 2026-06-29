@@ -436,6 +436,9 @@ async def test_rule(
     else:
         return {"success": False, "error": f"Unknown section: {section}"}
 
+    # SSRF protection: only allow http/https URLs
+    if not url.startswith(("http://", "https://")):
+        return {"success": False, "error": "Only http/https URLs are allowed", "url": url}
     try:
         html = await fetch_url(url)
     except Exception as exc:
