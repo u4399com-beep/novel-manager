@@ -49,12 +49,6 @@ _stats = {
 # ── Lazy imports to avoid circular deps ──────────────────────
 
 
-def _get_redis():
-    """Lazy import Redis to avoid blocking startup."""
-    from app.services.redis_cache import _get_redis as get_r
-    return get_r()
-
-
 def _get_page_cache():
     from app.services.page_cache import page_cache
     return page_cache

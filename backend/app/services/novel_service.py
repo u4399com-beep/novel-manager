@@ -123,7 +123,17 @@ async def update_novel(
 
 
 async def delete_novel(db: AsyncSession, novel: Novel) -> None:
-    """Delete a novel (cascade deletes chapters)."""
+    """Delete a novel and its chapter content files."""
+    # Clean up chapter content files before cascade delete
+    from app.services.content_store import adelete_content
+    from app.models.chapter import Chapter
+    from sqlalchemy import select as sa_select
+    chapters = (await db.execute(
+        sa_select(Chapter.id, Chapter.content_file).where(Chapter.novel_id == novel.id)
+    )).all()
+    for ch_id, ch_file in chapters:
+        if ch_file:
+            await adelete_content(novel.id, str(ch_id), ch_file)
     await db.delete(novel)
     await db.flush()
 
@@ -167,14 +177,16 @@ async def get_novel_statistics(db: AsyncSession, novel_id: str) -> dict:
 
 async def save_cover_image(novel: Novel, file_content: bytes, filename: str) -> str:
     """Save a cover image to static directory and return the URL."""
+    import asyncio as _asyncio
     covers_dir = os.path.join(settings.STATIC_DIR, "covers")
     os.makedirs(covers_dir, exist_ok=True)
-
     ext = os.path.splitext(filename)[1] or ".jpg"
     stored_name = f"{uuid.uuid4()}{ext}"
     file_path = os.path.join(covers_dir, stored_name)
 
-    with open(file_path, "wb") as f:
-        f.write(file_content)
+    def _write():
+        with open(file_path, "wb") as f:
+            f.write(file_content)
 
+    await _asyncio.to_thread(_write)
     return f"/static/covers/{stored_name}"

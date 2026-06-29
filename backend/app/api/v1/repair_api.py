@@ -140,10 +140,11 @@ async def start_repair_info(batch_size: int = 100, current_user: User = Depends(
             if not novels:
                 return
 
-            crawler = get_crawler("23qb")
             fixed = 0
             for novel in novels:
                 try:
+                    crawler = get_crawler(novel.source_name or "23qb")
+                    if not crawler: continue
                     info = await crawler.get_novel_info(novel.source_url)
                     changed = False
                     if info.get("author") and not novel.author:

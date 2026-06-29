@@ -31,9 +31,9 @@ request.interceptors.response.use(
       authStore.logout()
       router.push('/login')
     } else if (error.response?.status === 403) {
-      ElMessage.error('Permission denied')
+      // Let callers handle their own error messages (avoid double toast)
     } else if (error.response?.status === 404) {
-      ElMessage.error('Resource not found')
+      // Let callers handle their own error messages
     } else if (error.response?.status === 500) {
       ElMessage.error('Server error: ' + message)
     }

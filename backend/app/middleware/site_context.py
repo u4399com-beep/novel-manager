@@ -13,18 +13,13 @@ current_site: ContextVar[Optional[SiteModel]] = ContextVar(
 
 
 async def get_current_site(request, db_session) -> Optional[SiteModel]:
-    """Resolve the current site from request host (cached per-request)."""
+    """Resolve the current site from request host."""
     host = request.headers.get("host", "").split(":")[0]
-    site = current_site.get()
-    if site is not None:
-        return site
+    # Always validate host against DB — never cache across requests
     from sqlalchemy import select
     result = await db_session.execute(
         select(SiteModel).where(
             SiteModel.domain == host, SiteModel.is_active == True
         )
     )
-    site = result.scalars().first()
-    if site:
-        current_site.set(site)
-    return site
+    return result.scalars().first()

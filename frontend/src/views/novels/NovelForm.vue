@@ -110,9 +110,12 @@ const rules = {
   author: [{ required: true, message: '请输入作者名', trigger: 'blur' }],
 }
 
+const prevCoverUrl = ref<string | null>(null)
 function handleCoverChange(file: any) {
+  if (prevCoverUrl.value) URL.revokeObjectURL(prevCoverUrl.value)
   coverFile.value = file.raw
   coverPreview.value = URL.createObjectURL(file.raw)
+  prevCoverUrl.value = coverPreview.value
 }
 
 async function handleSubmit() {

@@ -19,8 +19,8 @@ router = APIRouter()
 async def search(
     q: str = Query(min_length=1, description="Search query"),
     type: str = Query(default="novel", pattern="^(novel|chapter)$"),
-    page: int = 1,
-    size: int = 20,
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     """Search across novels or chapters.
