@@ -62,6 +62,8 @@ async def translate_text(db: AsyncSession, text: str, target_lang: str, source_l
 async def translate_batch(db: AsyncSession, texts: list[str], target_lang: str, source_lang: str = "zh") -> list[str]:
     if target_lang == "zh":
         return texts
-    import asyncio as _asyncio
-    tasks = [translate_text(db, t, target_lang, source_lang) for t in texts]
-    return await _asyncio.gather(*tasks)
+    # Serialize to avoid concurrent session mutation (AsyncSession is not thread-safe)
+    results = []
+    for t in texts:
+        results.append(await translate_text(db, t, target_lang, source_lang))
+    return results

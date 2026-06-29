@@ -79,7 +79,16 @@ async def process_one(task_id: str, novel_title: str, remaining: int) -> bool:
         log.info(f"  ✅ {tid_short}")
         return True
     except asyncio.TimeoutError:
-        log.warning(f"  ⏱ {tid_short} timeout")
+        log.warning(f"  ⏱ {tid_short} timeout — resetting to pending")
+        try:
+            async with async_session_factory() as db:
+                task = await db.get(CrawlerTask, task_id)
+                if task and task.status == "running":
+                    task.status = "pending"
+                    task.error_message = f"Timeout after {TASK_TIMEOUT}s"
+                    await db.commit()
+        except Exception:
+            pass
         return False
     except Exception as e:
         log.warning(f"  ❌ {tid_short}: {str(e)[:80]}")

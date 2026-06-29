@@ -144,6 +144,7 @@ async def update_chapter(
 
     await db.flush()
     await db.refresh(chapter)
+    asyncio.create_task(_invalidate_cache(chapter.novel_id))
     return chapter
 
 
@@ -226,8 +227,7 @@ async def reorder_chapters(
         .values(sort_order=sort_case)
     )
     await db.flush()
-
-
+    asyncio.create_task(_invalidate_cache(novel_id))
 async def batch_delete_chapters(
     db: AsyncSession, novel_id: str, chapter_ids: list[str]
 ) -> int:
