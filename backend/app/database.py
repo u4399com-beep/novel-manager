@@ -33,7 +33,7 @@ for _ in range(3):
         engine = create_async_engine(settings.DATABASE_URL, **_kwargs)
         break
     except Exception:
-        import time; time.sleep(1)
+        import time; time.sleep(0.5)
 else:
     raise RuntimeError("Failed to create database engine after 3 retries")
 

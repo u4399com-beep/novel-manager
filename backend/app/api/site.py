@@ -469,12 +469,12 @@ async def site_home(
             select(lc_subq.c.novel_id, lc_subq.c.id, lc_subq.c.title)
             .where(lc_subq.c.rn == 1)
         )).all()
-        lc_map = {row[0]: (str(row[1]), row[2]) for row in lc_rows}
+        lc_map = {str(row[0]): (str(row[1]), row[2]) for row in lc_rows}
     else:
         lc_map = {}
     latest = []
     for n in latest_rows:
-        if n.id in lc_map:
+        if str(n.id) in lc_map:
             n.latest_chapter_id, n.latest_title = lc_map[n.id]
         latest.append(n)
 

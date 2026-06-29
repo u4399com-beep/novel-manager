@@ -14,7 +14,10 @@ from app.middleware.rate_limit import RateLimitMiddleware
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown events."""
-    os.makedirs(os.path.join(settings.STATIC_DIR, "covers"), exist_ok=True)
+    try:
+        os.makedirs(os.path.join(settings.STATIC_DIR, "covers"), exist_ok=True)
+    except OSError:
+        pass
     yield
     from app.database import engine
     await engine.dispose()

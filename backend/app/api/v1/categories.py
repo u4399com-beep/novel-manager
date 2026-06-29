@@ -30,8 +30,10 @@ async def list_categories(db: AsyncSession = Depends(get_db)):
         select(Category).order_by(Category.sort_order.asc())
     )
     cats = result.scalars().all()
-    _orm_cache[cache_key] = (now + 300, cats)
-    return cats
+    # Cache as Pydantic models to avoid DetachedInstanceError
+    validated = [CategoryRead.model_validate(c) for c in cats]
+    _orm_cache[cache_key] = (now + 300, validated)
+    return validated
 
 
 async def _invalidate_category_cache():

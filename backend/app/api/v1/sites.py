@@ -56,4 +56,4 @@ async def batch_delete_sites(data: dict, db: AsyncSession = Depends(get_db), cur
 async def delete_site(site_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     site = await db.get(Site, site_id)
     if not site: raise HTTPException(404, "Site not found")
-    await db.delete(site); await db.flush()
+    await db.delete(site); await db.flush(); await db.commit()

@@ -80,13 +80,24 @@ def load_rule(source_name: str) -> Optional[dict[str, Any]]:
 
 
 def save_rule(source_name: str, data: dict[str, Any]) -> bool:
-    """Save (create or overwrite) a rule file."""
+    """Save (create or overwrite) a rule file — atomic write."""
+    import tempfile
+    if not _SAFE_NAME_RE.match(source_name):
+        return False
     RULES_DIR.mkdir(parents=True, exist_ok=True)
     filepath = RULES_DIR / f"{source_name}.json"
-    filepath.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8",
+    # Write to temp file first, then atomic rename
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", dir=RULES_DIR,
+        encoding="utf-8", delete=False,
     )
+    try:
+        json.dump(data, tmp, ensure_ascii=False, indent=2)
+        tmp.close()
+        os.replace(tmp.name, filepath)  # atomic on POSIX
+    except Exception:
+        os.unlink(tmp.name)
+        raise
     return True
 
 
@@ -358,10 +369,6 @@ def apply_rule(
                         min_line_length=cleaner_config.get("min_line_length", 2),
                         max_repeat_ratio=cleaner_config.get("max_repeat_ratio", 0.6),
                     )
-            for field_name in ("title",):
-                if field_name in row and row[field_name]:
-                    row[field_name] = clean_title(row[field_name])
-            # Also clean book titles in novel_info / search results
             for field_name in ("title",):
                 if field_name in row and row[field_name]:
                     row[field_name] = clean_novel_title(row[field_name])

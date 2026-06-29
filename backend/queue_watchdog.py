@@ -71,12 +71,13 @@ def start_runner():
     """Start queue_runner.py as a background process."""
     log.info("Starting queue_runner...")
     try:
-        subprocess.Popen(
+        proc = subprocess.Popen(
             [sys.executable, QUEUE_SCRIPT, "--concurrent", "8"],
-            stdout=open("/tmp/queue_runner.log", "a"),
+            stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
             cwd=os.path.dirname(os.path.abspath(__file__)),
         )
+        # Detach — let it run independently
         return True
     except Exception as e:
         log.error(f"Failed to start queue_runner: {e}")

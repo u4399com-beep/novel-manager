@@ -94,7 +94,8 @@ class QueueMonitor:
 
         # Speed calculation
         prev_done = self._prev_stats.get("completed", 0) + self._prev_stats.get("failed", 0)
-        speed = (done - prev_done) / self.interval if self._prev_stats else 0
+        interval = max(self.interval, 0.1)  # guard against div-by-zero
+        speed = (done - prev_done) / interval if self._prev_stats else 0
 
         # ETA
         remaining = stats["pending"]

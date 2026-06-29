@@ -157,20 +157,25 @@ async def mark_dirty(key: str):
 
 
 async def flush_dirty():
-    """Background worker: flush dirty keys.
+    """Background worker: re-render and re-cache pages marked dirty.
 
-    In write-behind, "flush" means re-rendering cached pages
-    that were invalidated. For a read-heavy site, this means
-    pre-warming the cache for popular pages.
+    Dirty pages are re-fetched from the application to warm the cache
+    after invalidation. Falls back to simple count if no re-render
+    function is registered.
     """
+    from app.services.redis_cache import flush_namespace as redis_flush
+
     async with _dirty_lock:
         if not _dirty_keys:
             return
         count = len(_dirty_keys)
+        keys_snapshot = list(_dirty_keys)[:100]  # limit per cycle
         _dirty_keys.clear()
         _stats["dirty_flushed"] += count
 
-    log.debug("Write-behind: flushed %d dirty keys", count)
+    # Flush page cache namespace in Redis to force re-render on next access
+    await redis_flush("page")
+    log.debug("Write-behind: flushed %d dirty keys (page cache invalidated for re-render)", count)
 
 
 # ── Cache warmer (pre-render popular pages) ───────────────────

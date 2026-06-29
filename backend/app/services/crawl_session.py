@@ -65,6 +65,18 @@ class CrawlSession:
 
 # Global registry: task_id -> CrawlSession
 _sessions: dict[str, CrawlSession] = {}
+_SESSION_TTL = 7200  # 2 hours max session lifetime
+
+
+async def _cleanup_stale_sessions():
+    """Remove sessions older than _SESSION_TTL."""
+    now = time.monotonic()
+    stale = [
+        tid for tid, s in _sessions.items()
+        if now - s.started_at > _SESSION_TTL or s.finished
+    ]
+    for tid in stale:
+        _sessions.pop(tid, None)
 
 
 def create_session(task_id: str, novel_title: str = "") -> CrawlSession:

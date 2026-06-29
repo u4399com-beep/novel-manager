@@ -68,5 +68,6 @@ if settings.DATABASE_URL == _DEFAULT_DB:
         "Set DATABASE_URL env var for production."
     )
 
-if any("localhost" in str(o) for o in settings.CORS_ORIGINS):
+_localhost_origins = [o for o in settings.CORS_ORIGINS if "://localhost" in str(o) or "://127.0.0.1" in str(o)]
+if _localhost_origins:
     log.info("CORS origins include localhost — fine for development.")
