@@ -47,6 +47,7 @@ async def create_category(
     category = Category(**data.model_dump())
     db.add(category)
     await db.flush()
+    await db.commit()
     await db.refresh(category)
     await _invalidate_category_cache()
     return category
@@ -80,6 +81,7 @@ async def update_category(
         setattr(category, field, value)
 
     await db.flush()
+    await db.commit()
     await db.refresh(category)
     await _invalidate_category_cache()
     return category
@@ -99,4 +101,5 @@ async def delete_category(
 
     await db.delete(category)
     await db.flush()
+    await db.commit()
     await _invalidate_category_cache()

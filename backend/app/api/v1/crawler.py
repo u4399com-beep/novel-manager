@@ -918,24 +918,6 @@ async def delete_task(
 # Background runners
 # ---------------------------------------------------------------------------
 
-async def _run_in_session(task_id: str, mode: str = "direct"):
-    from app.services.crawl_session import create_session, remove_session
-    create_session(task_id, "")
-    try:
-        for retry in range(5):
-            try:
-                async with async_session_factory() as session:
-                    await crawler_service.run_crawl(session, task_id, mode=mode)
-                break  # success
-            except ValueError as exc:
-                if "not found" in str(exc) and retry < 4:
-                    await asyncio.sleep(0.3 * (retry + 1))
-                    continue
-                raise
-    finally:
-        remove_session(task_id)
-
-
 async def _run_batch_in_session(task_ids: list[str], mode: str = "direct"):
     from app.services.crawl_session import create_session, remove_session
     for tid in task_ids:

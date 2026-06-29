@@ -50,9 +50,6 @@ async def update_site(site_id: str, data: dict, db: AsyncSession = Depends(get_d
         from app.services.page_cache import page_cache
         await flush_namespace("page")
         page_cache.clear()
-        # Clear Jinja2 translate filter in-memory cache
-        for tpl in _tpl_cache.values() if False else []:
-            pass  # Force template reload
     return site
 
 @router.post("/batch-delete", status_code=200)

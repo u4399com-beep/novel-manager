@@ -136,10 +136,40 @@ async def repair_empty_chapters():
             log.info(f"Auto-repair: created {created} tasks for {len(novel_counts)} novels with empty chapters")
         return created
 
+COMPLETE_KW = ['大结局','完结','本书完','全文完','全本完','完本','终章','致谢','后记','(完)','【完】','[完]','全书完','大結局','完結']
+
+async def auto_mark_completed():
+    """Mark novels as completed when chapters indicate completion."""
+    from app.database import async_session_factory
+    from app.models.chapter import Chapter
+    from app.models.novel import Novel
+    from sqlalchemy import select, update, func
+    
+    async with async_session_factory() as db:
+        # Find chapter titles/content with completion keywords
+        found_ids = set()
+        for kw in COMPLETE_KW:
+            result = await db.execute(
+                select(Chapter.novel_id).where(
+                    Chapter.title.contains(kw) | Chapter.content.contains(kw)
+                ).limit(500)
+            )
+            for row in result.fetchall():
+                found_ids.add(row[0])
+        
+        if found_ids:
+            result = await db.execute(
+                update(Novel).where(Novel.id.in_(list(found_ids)), Novel.status != 'completed')
+                .values(status='completed')
+            )
+            await db.commit()
+            if result.rowcount > 0:
+                log.info(f'Auto-complete: marked {result.rowcount} novels')
+
 async def watchdog_cycle():
     """One watchdog check cycle."""
-    # Auto-repair empty chapters
     await repair_empty_chapters()
+    await auto_mark_completed()
     stats = await get_queue_stats()
     alive = is_runner_alive()
 

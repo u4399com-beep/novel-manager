@@ -756,6 +756,9 @@ async def site_chapter(
         select(Novel).where(Novel.id == chapter.novel_id)
     )).scalar_one_or_none()
 
+    if not novel:
+        raise HTTPException(status_code=404, detail="Novel not found for this chapter")
+
     # Prev / Next
     prev_ch = (await db.execute(
         select(Chapter)
