@@ -85,16 +85,21 @@ def start_runner():
 
 
 async def _release_orphaned_lock():
-    """Release any orphaned DB queue lock before restarting the runner."""
+    """Release expired DB queue lock before restarting (only if TTL exceeded)."""
     try:
         from app.database import async_session_factory
         from sqlalchemy import text
         async with async_session_factory() as db:
-            await db.execute(text(
-                "UPDATE system_state SET `value`=NULL, locked_at=NULL, worker_pid=NULL"
+            result = await db.execute(text(
+                "UPDATE system_state SET value=NULL, locked_at=NULL, worker_pid=NULL "
+                "WHERE locked_at IS NOT NULL "
+                "AND EXTRACT(EPOCH FROM (NOW() - locked_at)) > lock_ttl"
             ))
             await db.commit()
-            log.info("Orphaned DB lock released")
+            if result.rowcount > 0:
+                log.info(f"Orphaned DB lock released ({result.rowcount} row(s))")
+            else:
+                log.info("DB lock is still active — not releasing")
     except Exception as e:
         log.warning(f"Failed to release orphaned lock: {e}")
 

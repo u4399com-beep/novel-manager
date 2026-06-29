@@ -81,6 +81,9 @@ async def get_chapter(
     chapter = await chapter_service.get_chapter(db, chapter_id)
     if not chapter or chapter.novel_id != novel_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter not found")
+    # Load content from file store if stored on disk
+    if not chapter.content and chapter.content_file:
+        chapter.content = await chapter_service.get_chapter_content(chapter)
     return chapter
 
 

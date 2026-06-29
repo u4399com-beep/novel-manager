@@ -12,7 +12,6 @@ from app.api.v1.link_rings import router as link_rings_router
 from app.api.v1.cache_admin import router as cache_admin_router
 from app.api.v1.watchdog_api import router as watchdog_router
 from app.api.v1.repair_api import router as repair_router
-from app.api.site import router as site_router
 
 api_router = APIRouter()
 

@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 20
     DB_POOL_RECYCLE: int = 3600
 
-    # Auth
-    SECRET_KEY: str = "change-me-in-production-use-a-strong-random-key"
+    # Auth — SECRET_KEY auto-generated if not set (override via env for production)
+    SECRET_KEY: str = ""
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     # Redis
@@ -54,14 +54,19 @@ settings = Settings()
 
 # ── Startup safety checks ──────────────────────────────────────────
 
-_DEFAULT_SECRET = "change-me-in-production-use-a-strong-random-key"
 _DEFAULT_DB = "mysql+asyncmy://root:password@localhost:3306/novel_manager"
 
-if settings.SECRET_KEY == _DEFAULT_SECRET:
+if not settings.SECRET_KEY:
+    import secrets as _secrets
+    settings.SECRET_KEY = _secrets.token_urlsafe(32)
+    log.warning(
+        "SECRET_KEY auto-generated for this session. "
+        "Set SECRET_KEY env var for persistent keys across restarts."
+    )
+elif settings.SECRET_KEY == "change-me-in-production-use-a-strong-random-key":
     log.warning(
         "SECRET_KEY is still the default placeholder! "
-        "Set SECRET_KEY env var to a strong random value. "
-        "JWT tokens are forgeable with the default key."
+        "Set SECRET_KEY env var to a strong random value."
     )
 
 if settings.DATABASE_URL == _DEFAULT_DB:
