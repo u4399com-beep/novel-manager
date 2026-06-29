@@ -9,9 +9,9 @@ import os
 import multiprocessing
 
 # ---- Workers ----
-workers = int(os.getenv("GUNICORN_WORKERS", min(8, multiprocessing.cpu_count() * 2)))
+workers = int(os.getenv("GUNICORN_WORKERS", min(8, max(4, multiprocessing.cpu_count()))))
 worker_class = "uvicorn.workers.UvicornWorker"
-worker_connections = 1000
+worker_connections = 2000
 timeout = 300
 keepalive = 5
 

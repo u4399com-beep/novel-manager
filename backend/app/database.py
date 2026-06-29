@@ -9,7 +9,18 @@ _is_mysql = "mysql" in settings.DATABASE_URL or "asyncmy" in settings.DATABASE_U
 
 _kwargs: dict = {"echo": False, "future": True}
 if _is_mysql:
-    _kwargs.update(pool_size=50, max_overflow=50, pool_recycle=3600, pool_timeout=15)
+    # Per-worker pool: sized for 8 workers under MySQL max_connections=151
+    # 8 workers × (12+6) = 144 < 151 (safe)
+    import os as _os
+    _workers = int(_os.getenv("GUNICORN_WORKERS", _os.getenv("UVICORN_WORKERS", "4")))
+    _pool_per_worker = max(8, min(50, 120 // max(_workers, 1)))
+    _overflow_per_worker = max(4, _pool_per_worker // 2)
+    _kwargs.update(
+        pool_size=_pool_per_worker,
+        max_overflow=_overflow_per_worker,
+        pool_recycle=3600,
+        pool_timeout=15,
+    )
 elif _is_sqlite:
     _kwargs["connect_args"] = {"timeout": 20}
 

@@ -8,22 +8,47 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1.router import api_router
 from app.api.site import router as site_router
 from app.config import settings
+from app.middleware.rate_limit import RateLimitMiddleware
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown events."""
-    # Startup: ensure static directories exist
     os.makedirs(os.path.join(settings.STATIC_DIR, "covers"), exist_ok=True)
     yield
-    # Shutdown: dispose database engine
     from app.database import engine
-
     await engine.dispose()
 
 
+async def _db_health() -> bool:
+    try:
+        from app.database import async_session_factory
+        from sqlalchemy import text
+        async with async_session_factory() as s:
+            await s.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
+
+
+async def _redis_health() -> dict:
+    try:
+        from app.services.redis_cache import _get_redis
+        r = await _get_redis()
+        if r:
+            info = await r.info("memory")
+            return {
+                "connected": True,
+                "used_memory": info.get("used_memory_human", "?"),
+                "keys": await r.dbsize(),
+            }
+        return {"connected": False, "reason": "not_configured"}
+    except Exception as e:
+        return {"connected": False, "reason": str(e)[:100]}
+
+
 def create_app() -> FastAPI:
-    """Application factory — creates and configures the FastAPI app."""
+    """Application factory."""
     app = FastAPI(
         title=settings.APP_TITLE,
         version=settings.APP_VERSION,
@@ -32,30 +57,59 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # CORS middleware
+    # Rate limiting (100 req/60s per IP on API routes)
+    app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
+
+    # CORS
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
-    # Mount static files
+    # Static files
     static_dir = os.path.abspath(settings.STATIC_DIR)
     if os.path.isdir(static_dir):
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-    # SEO-friendly public site (root level, no prefix)
+    # Routers
     app.include_router(site_router)
-
-    # Include API router
     app.include_router(api_router, prefix=settings.API_PREFIX)
 
-    # Health check endpoint
+    # Health check (DB + Redis aware)
     @app.get("/health")
     async def health_check():
-        return {"status": "ok", "version": settings.APP_VERSION}
+        db_ok = await _db_health()
+        redis = await _redis_health()
+        overall = "ok" if db_ok else "degraded"
+        return {
+            "status": overall,
+            "version": settings.APP_VERSION,
+            "database": "ok" if db_ok else "unreachable",
+            "redis": redis,
+        }
+
+    @app.get("/metrics")
+    async def metrics():
+        from app.services.page_cache import page_cache
+        from app.services.write_behind_cache import get_stats as wb_stats
+        from app.services.content_store import stats as cs_stats
+        from app.database import engine
+
+        return {
+            "cache": {
+                "page": page_cache.stats,
+                "write_behind": wb_stats(),
+            },
+            "content_store": cs_stats(),
+            "db_pool": {
+                "size": engine.pool.size(),
+                "checked_in": engine.pool.checkedin(),
+                "overflow": engine.pool.overflow(),
+            },
+        }
 
     return app
 
