@@ -384,6 +384,264 @@ server {
 }
 ```
 
+```
+
+---
+
+## 方式五：飞牛云 FNS (FNOS) 部署
+
+飞牛云 FNS 是基于 Debian 的 NAS 操作系统，支持 Docker 和手动部署两种方式。
+
+### 环境信息
+
+| 项目 | 说明 |
+|------|------|
+| 系统 | FNS (FNOS) 基于 Debian 12 |
+| 架构 | x86_64 / ARM64 |
+| 默认 Web 端口 | 5666 (FNS 管理界面) |
+| 建议部署方式 | Docker Compose |
+
+### 5.1 Docker Compose 部署（推荐）
+
+#### 1. 开启 SSH
+
+FNS 管理界面 → 设置 → 终端 → 开启 SSH → 记录端口（默认 22）
+
+```bash
+ssh your-nas-ip -p 22
+```
+
+#### 2. 创建项目目录
+
+```bash
+# 建议放在数据卷上（空间充足）
+mkdir -p /vol1/docker/novel-manager
+cd /vol1/docker/novel-manager
+```
+
+#### 3. 创建 docker-compose.yml
+
+```bash
+cat > docker-compose.yml << 'EOF'
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: novel-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: NovelManager@2024
+      MYSQL_DATABASE: novel_manager
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: novel-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis-data:/data
+
+  backend:
+    image: python:3.11-slim
+    container_name: novel-backend
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple &&
+             alembic upgrade head &&
+             gunicorn -k uvicorn.workers.UvicornWorker -w 2 --bind 0.0.0.0:8008 app.main:app"
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=mysql+asyncmy://root:NovelManager@2024@mysql:3306/novel_manager
+      - SECRET_KEY=fns-novel-manager-secret-key-change-me
+      - CORS_ORIGINS=["http://your-nas-ip:5173","http://localhost:5173"]
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - mysql
+      - redis
+
+  queue:
+    image: python:3.11-slim
+    container_name: novel-queue
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple &&
+             python3 queue_runner.py --concurrent 5"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=mysql+asyncmy://root:NovelManager@2024@mysql:3306/novel_manager
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - mysql
+      - redis
+
+  watchdog:
+    image: python:3.11-slim
+    container_name: novel-watchdog
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple &&
+             python3 queue_watchdog.py"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=mysql+asyncmy://root:NovelManager@2024@mysql:3306/novel_manager
+    depends_on:
+      - mysql
+
+  frontend:
+    image: node:20-alpine
+    container_name: novel-frontend
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install &&
+             npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
+
+  # LibreTranslate (可选 — 内容翻译)
+  libretranslate:
+    image: libretranslate/libretranslate:v1.9.5
+    container_name: novel-translate
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+EOF
+```
+
+#### 4. 拉取代码并启动
+
+```bash
+# 克隆项目
+git clone https://github.com/u4399com-beep/novel-manager.git /tmp/novel-manager
+cp -r /tmp/novel-manager/backend ./
+cp -r /tmp/novel-manager/frontend ./
+rm -rf /tmp/novel-manager
+
+# 创建内容存储目录
+mkdir -p data/content
+
+# 启动
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+```
+
+#### 5. 访问
+
+```
+后端:   http://your-nas-ip:8008
+前端:   http://your-nas-ip:5173
+API文档: http://your-nas-ip:8008/docs
+```
+
+---
+
+### 5.2 FNS Docker 应用商店部署
+
+FNS 支持 Docker 应用一键部署：
+
+1. 打开 FNS 管理界面 → **Docker** → **应用商店**
+2. 点击 **添加应用** → **Compose**
+3. 粘贴上面的 `docker-compose.yml` 内容
+4. 点击 **部署**
+5. 等待容器启动完成
+
+---
+
+### 5.3 手动部署（Debian 底层）
+
+FNS 基于 Debian，可通过 SSH 手动部署：
+
+```bash
+# SSH 登录 FNS
+ssh your-nas-ip
+
+# 安装 Docker（如果未安装）
+curl -fsSL https://get.docker.com | sh
+
+# 安装 Docker Compose
+apt update && apt install -y docker-compose git
+
+# 后续步骤同 "5.1 Docker Compose 部署"
+```
+
+---
+
+### 5.4 FNS 端口说明
+
+FNS 默认占用以下端口，避免冲突：
+
+| 端口 | 服务 | 说明 |
+|------|------|------|
+| 5666 | FNS 管理 | 系统保留 |
+| 8000 | FNS 应用 | 可能占用，项目改用 8008 |
+| 8008 | Novel 后端 | ✅ 本项目 |
+| 5173 | Novel 前端 | ✅ 本项目 |
+| 3306 | MySQL | ✅ 数据库 |
+| 6379 | Redis | ✅ 缓存 |
+| 5001 | LibreTranslate | 可选 |
+
+---
+
+### 5.5 FNS 外网访问
+
+通过 FNS 自带的内网穿透或 DDNS 实现外网访问：
+
+**方式 A — FNS 内网穿透**：
+FNS 管理 → 网络 → 内网穿透 → 添加映射：
+```
+本地端口 5173 → 外网端口 5173
+本地端口 8008 → 外网端口 8008
+```
+
+**方式 B — 反代 + DDNS**：
+```bash
+# 安装 Nginx
+apt install -y nginx
+
+# 配置反代 (参考 "方式二 Linux 部署" 中的 Nginx 配置)
+# 配合 DDNS 实现域名访问
+```
+
+---
+
+### 5.6 FNS 定时任务
+
+在 FNS 管理界面设置 cron 定时任务：
+
+```bash
+# 每天凌晨 3 点重启看门狗（防止僵死）
+0 3 * * * docker restart novel-watchdog
+
+# 每周日凌晨 4 点备份数据库
+0 4 * * 0 docker exec novel-mysql mysqldump -uroot -pNovelManager@2024 novel_manager > /vol1/backup/novel_$(date +\%Y\%m\%d).sql
+```
+
 ---
 
 ## 初始化配置
