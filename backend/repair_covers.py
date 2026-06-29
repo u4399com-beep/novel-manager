@@ -78,8 +78,9 @@ async def fix_covers(batch_size=100, concurrency=30):
         )).scalar()
         log.info(f"Remaining: {remaining}")
 
+from sqlalchemy import func
+
 if __name__ == "__main__":
     import signal
-    from sqlalchemy import func
     signal.signal(signal.SIGINT, lambda s, f: sys.exit(0))
     asyncio.run(fix_covers(batch_size=500, concurrency=30))

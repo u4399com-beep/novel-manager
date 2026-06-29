@@ -73,6 +73,7 @@ async def _render_page(
     from app.services.page_cache import page_cache
 
     lang = site.language if site else "zh"
+
     html = await asyncio.to_thread(tpl.env.get_template(template_name).render, context)
 
     # L2: In-memory (microsecond)
@@ -149,11 +150,11 @@ async def _set_orm_cache(key: str, val: object, ttl: int):
 
 
 async def _get_site(request, db) -> Optional[Site]:
-    """Resolve the current Site from the request Host header (cached 1h)."""
+    """Resolve the current Site from the request Host header (cached 60s)."""
     host = request.headers.get("host", "").split(":")[0]
     cache_key = f"site:{host}"
 
-    cached = await _cached_orm(cache_key, ttl=3600)
+    cached = await _cached_orm(cache_key, ttl=30)
     if cached is not _ORM_MISS:
         return cached
 
@@ -161,7 +162,7 @@ async def _get_site(request, db) -> Optional[Site]:
         select(Site).where(Site.domain == host, Site.is_active == True)
     )
     site = result.scalars().first()
-    await _set_orm_cache(cache_key, site if site is not None else _ORM_MISS, ttl=3600)
+    await _set_orm_cache(cache_key, site if site is not None else _ORM_MISS, ttl=60)
     return site
 
 
@@ -184,6 +185,49 @@ router = APIRouter(tags=["Site"])
 
 # Default templates (used when no site matches)
 templates = Jinja2Templates(directory="app/templates")
+
+
+
+async def _translate_page_data(db, context: dict, lang: str):
+    """Translate all translatable content in the context dict.
+    Call this in each route BEFORE rendering when lang is non-Chinese."""
+    if lang in ("zh", "zh-TW", "") or not db:
+        return
+    try:
+        # Novels (plural, singular, featured, ranking, results, latest_novels)
+        for key in ("novels", "novel", "featured", "ranking", "results", "latest_novels"):
+            items = context.get(key)
+            if not items: continue
+            if not isinstance(items, list): items = [items]
+            for n in items:
+                if hasattr(n, "title") and n.title and any('\u4e00' <= c <= '\u9fff' for c in n.title):
+                    n.title = await tr_content(db, n.title, lang)
+                if hasattr(n, "author") and n.author and any('\u4e00' <= c <= '\u9fff' for c in n.author):
+                    n.author = await tr_content(db, n.author, lang)
+                if hasattr(n, "description") and n.description and any('\u4e00' <= c <= '\u9fff' for c in n.description):
+                    n.description = await tr_content(db, n.description[:500], lang)
+                if hasattr(n, "latest_title") and n.latest_title:
+                    try: n.latest_title = await tr_content(db, n.latest_title, lang)
+                    except: pass
+        # Site name — use i18n key, don't translate DB value
+        # Categories
+        for cat in context.get("categories") or []:
+            if hasattr(cat, "name") and cat.name:
+                cat.name = await tr_content(db, cat.name, lang)
+        # Chapters
+        for ckey in ("chapters", "all_chapters", "chapter"):
+            chs = context.get(ckey)
+            if not chs: continue
+            if not isinstance(chs, list): chs = [chs]
+            for ch in chs:
+                if hasattr(ch, "title") and ch.title:
+                    ch.title = await tr_content(db, ch.title, lang)
+        # Link wheel
+        for lw in context.get("link_wheel_links") or []:
+            if isinstance(lw, dict) and lw.get("anchor_text"):
+                lw["anchor_text"] = await tr_content(db, lw["anchor_text"], lang)
+    except Exception:
+        pass
 
 
 def _now():
@@ -498,8 +542,24 @@ async def site_home(
             n.latest_chapter_id, n.latest_title = lc_map[n.id]
         latest.append(n)
 
-    # ---- Link wheel links ----
+    # ---- Translate all content for non-Chinese sites ----
+    lang = site.language if site and site.language else "zh"
+    if lang not in ("zh", "zh-TW", ""):
+        await _tr_content(db, None, None, cats, lang)
+        for n in (novels or []): await _tr_content(db, n, None, None, lang)
+        for n in (featured or []): await _tr_content(db, n, None, None, lang)
+        for n in (latest or []): await _tr_content(db, n, None, None, lang)
+        for n in (ranking or []): await _tr_content(db, n, None, None, lang)
+        for cn in (category_novels or {}).values():
+            for n in cn: await _tr_content(db, n, None, None, lang)
+
+    # ---- Link wheel links (after translation for correct titles) ----
     link_wheel_links = await _safe_link_wheel(site, db, None, "home")
+    # Translate link wheel anchor text
+    if lang not in ("zh", "zh-TW", "") and link_wheel_links:
+        for lw in link_wheel_links:
+            if lw.get("anchor_text"):
+                lw["anchor_text"] = await tr_content(db, lw["anchor_text"], lang)
 
     context = {
         **_site_context(site),
@@ -522,6 +582,10 @@ async def site_home(
             "hero_carousel", "category_sections", "latest_updates",
             "hot_ranking", "friend_links", "link_wheel"),
     }
+    # Translate data for non-Chinese sites
+    _lang = site.language if site and site.language else "zh"
+    await _translate_page_data(db, context, _lang)
+
     return await _render_page(
         "home", tpl, "pages/home.html", context, site,
         request.url.path, str(request.query_params),
@@ -564,6 +628,7 @@ async def site_novel(
     cats = await _get_categories(db)
     lang = site.language if site and site.language else "zh"
     await _tr_content(db, novel, None, cats, lang)
+    for ch in (chapters or []): await _tr_content(db, None, ch, None, lang)
 
     # ---- Link wheel links ----
     link_wheel_links = await _safe_link_wheel(site, db, novel.id, "novel_detail")
@@ -579,6 +644,10 @@ async def site_novel(
         "link_wheel_links": link_wheel_links,
         "modules": _build_modules(site, "novel_detail", "friend_links", "link_wheel"),
     }
+    # Translate data for non-Chinese sites
+    _lang = site.language if site and site.language else "zh"
+    await _translate_page_data(db, context, _lang)
+
     return await _render_page(
         "novel_detail", tpl, "pages/novel.html", context, site,
         request.url.path, str(request.query_params),
@@ -647,6 +716,20 @@ async def site_chapter_list(
         "link_wheel_links": link_wheel_links,
         "modules": _build_modules(site, "chapter_list", "link_wheel"),
     }
+    # Translate all chapters for non-Chinese sites
+    _lang = site.language if site and site.language else "zh"
+    if _lang not in ("zh", "zh-TW", ""):
+        await _tr_content(db, novel, None, cats, _lang)
+        for _ch in all_chapters:
+            await _tr_content(db, None, _ch, None, _lang)
+        if link_wheel_links:
+            for _lw in link_wheel_links:
+                if _lw.get("anchor_text"):
+                    _lw["anchor_text"] = await tr_content(db, _lw["anchor_text"], _lang)
+    # Translate data for non-Chinese sites
+    _lang = site.language if site and site.language else "zh"
+    await _translate_page_data(db, context, _lang)
+
     return await _render_page(
         "chapter_list", tpl, "pages/chapter_list.html", context, site,
         request.url.path, str(request.query_params),
@@ -695,10 +778,12 @@ async def site_chapter(
 
     # Translate content for non-Chinese sites
     lang_ch = site.language if site and site.language else "zh"
-    await _tr_content(db, novel, chapter, None, lang_ch)
 
-    # Read content from file store (or DB fallback)
+    # Read content from file store
     chapter_content = await get_chapter_content(chapter)
+    # Translate chapter content
+    if lang_ch not in ("zh", "zh-TW", "") and chapter_content:
+        chapter_content = await tr_content(db, chapter_content[:4000], lang_ch)
 
     # ---- Chapter pagination ----
     all_pages = _paginate_chapter(chapter_content, site)
@@ -789,6 +874,10 @@ async def site_chapter(
         "modules": _build_modules(site, "chapter_read",
             "random_recommend", "reader_toolbar", "link_wheel"),
     }
+    # Translate data for non-Chinese sites
+    _lang = site.language if site and site.language else "zh"
+    await _translate_page_data(db, context, _lang)
+
     return await _render_page(
         "chapter_read", tpl, "pages/chapter.html", context, site,
         request.url.path, str(request.query_params),
@@ -827,8 +916,24 @@ async def site_search(
 
     cats = await _get_categories(db)
 
-    # ---- Link wheel links ----
+    # ---- Translate all content for non-Chinese sites ----
+    lang = site.language if site and site.language else "zh"
+    if lang not in ("zh", "zh-TW", ""):
+        await _tr_content(db, None, None, cats, lang)
+        for n in (novels or []): await _tr_content(db, n, None, None, lang)
+        for n in (featured or []): await _tr_content(db, n, None, None, lang)
+        for n in (latest or []): await _tr_content(db, n, None, None, lang)
+        for n in (ranking or []): await _tr_content(db, n, None, None, lang)
+        for cn in (category_novels or {}).values():
+            for n in cn: await _tr_content(db, n, None, None, lang)
+
+    # ---- Link wheel links (after translation for correct titles) ----
     link_wheel_links = await _safe_link_wheel(site, db, None, "home")
+    # Translate link wheel anchor text
+    if lang not in ("zh", "zh-TW", "") and link_wheel_links:
+        for lw in link_wheel_links:
+            if lw.get("anchor_text"):
+                lw["anchor_text"] = await tr_content(db, lw["anchor_text"], lang)
 
     context = {
         **_site_context(site),
@@ -844,6 +949,10 @@ async def site_search(
         "link_wheel_links": link_wheel_links,
         "modules": _build_modules(site, "search", "link_wheel"),
     }
+    # Translate data for non-Chinese sites
+    _lang = site.language if site and site.language else "zh"
+    await _translate_page_data(db, context, _lang)
+
     return await _render_page(
         "search", tpl, "pages/search.html", context, site,
         request.url.path, str(request.query_params),
@@ -896,8 +1005,24 @@ async def site_novels(
     for n in all_page_novels:
         await _tr_content(db, n, None, None, lang)
 
-    # ---- Link wheel links ----
+    # ---- Translate all content for non-Chinese sites ----
+    lang = site.language if site and site.language else "zh"
+    if lang not in ("zh", "zh-TW", ""):
+        await _tr_content(db, None, None, cats, lang)
+        for n in (novels or []): await _tr_content(db, n, None, None, lang)
+        for n in (featured or []): await _tr_content(db, n, None, None, lang)
+        for n in (latest or []): await _tr_content(db, n, None, None, lang)
+        for n in (ranking or []): await _tr_content(db, n, None, None, lang)
+        for cn in (category_novels or {}).values():
+            for n in cn: await _tr_content(db, n, None, None, lang)
+
+    # ---- Link wheel links (after translation for correct titles) ----
     link_wheel_links = await _safe_link_wheel(site, db, None, "home")
+    # Translate link wheel anchor text
+    if lang not in ("zh", "zh-TW", "") and link_wheel_links:
+        for lw in link_wheel_links:
+            if lw.get("anchor_text"):
+                lw["anchor_text"] = await tr_content(db, lw["anchor_text"], lang)
 
     context = {
         **_site_context(site),
@@ -920,6 +1045,10 @@ async def site_novels(
             "hero_carousel", "category_sections", "latest_updates",
             "hot_ranking", "friend_links", "link_wheel"),
     }
+    # Translate data for non-Chinese sites
+    _lang = site.language if site and site.language else "zh"
+    await _translate_page_data(db, context, _lang)
+
     return await _render_page(
         "book_library", tpl, "pages/home.html", context, site,
         request.url.path, str(request.query_params),

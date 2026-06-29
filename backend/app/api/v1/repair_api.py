@@ -181,7 +181,9 @@ async def repair_logs(task: str, lines: int = 30, current_user: User = Depends(g
         "covers": "/tmp/repair_covers.log",
         "info": "/tmp/repair_info.log",
     }
-    path = log_files.get(task, f"/tmp/repair_{task}.log")
+    if task not in log_files:
+        raise HTTPException(status_code=400, detail=f"Unknown task: {task}")
+    path = log_files[task]
     try:
         with open(path) as f:
             all_lines = f.readlines()

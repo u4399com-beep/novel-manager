@@ -45,7 +45,7 @@
   </div>
 </main>
 <footer id="footer" class="wrapper">
-  <div class="content"><p>&copy; 2026 铅笔小说 · 本站内容来源于网络采集</p></div>
+  <div class="content"><p>{{ T('site_footer')|replace('{site_name}', site.name if site else T('site_name')) }}</p></div>
 </footer>
 <script>window.addEventListener('scroll',function(){document.getElementById('header').classList.toggle('scrolled',window.scrollY>10)});</script>
 {% block scripts %}{% endblock %}

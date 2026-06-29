@@ -149,7 +149,7 @@ class AntiDetectClient:
         self._clients: dict[str, httpx.AsyncClient] = {}
         self._last_request: dict[str, float] = {}
         self._last_url: dict[str, str] = {}
-        self._cookies: dict[str, httpx.Cookies] = defaultdict(httpx.Cookies)
+        self._cookies: dict[str, httpx.Cookies] = defaultdict(lambda: httpx.Cookies())
         self._profile_idx = 0
 
     def _random_profile(self) -> dict:

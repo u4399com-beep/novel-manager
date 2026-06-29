@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}首页{% endblock %}
 {% block body_class %}homepage{% endblock %}
-{% block description %}铅笔小说 - 免费在线小说阅读，海量精品小说资源，每日更新{% endblock %}
+{% block description %}{{ T('site_desc_default') }}{% endblock %}
 
 {% block breadcrumb %}
 <div class="breadcrumb"><div class="content">
@@ -135,7 +135,7 @@
         <a href="{{ link.url }}" target="_blank" rel="nofollow">{{ link.name }}</a>
         {% endfor %}
         {% if not (friend_links or []) %}
-        <a href="https://www.23qb.net" target="_blank" rel="nofollow">铅笔小说</a>
+        <a href="https://www.23qb.net" target="_blank" rel="nofollow">{{ T('site_name') }}</a>
         {% endif %}
       </div>
     </div>
