@@ -205,10 +205,10 @@ async def get_cached_page(
 
 
 async def invalidate_novel(novel_id: str):
-    """Invalidate all caches related to a novel update."""
-    await flush_namespace("page")
+    """Invalidate caches for a specific novel (targeted, not global)."""
+    await delete_pattern("page", f"*{novel_id}*")
     await delete_pattern("query", f"*{novel_id}*")
-    await delete_pattern("fragment", "*")
+    await delete_pattern("fragment", f"*{novel_id}*")
 
 
 async def invalidate_site(site_id: str):

@@ -111,6 +111,9 @@ async def submit_crawl_tasks(count: int):
 
     async with async_session_factory() as db:
         novels = (await db.execute(select(Novel.id).limit(count))).scalars().all()
+        if not novels:
+            print("ERROR: No novels in database — cannot run stress test")
+            return
         if len(novels) < count:
             novels = list(novels) + [novels[0]] * (count - len(novels))
 

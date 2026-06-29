@@ -185,7 +185,7 @@ async def watchdog_cycle():
     if needs_restart:
         # Kill existing runner first
         subprocess.run(["pkill", "-9", "-f", "queue_runner.py"], capture_output=True)
-        time.sleep(1)
+        await asyncio.sleep(1)
         start_runner()
 
 

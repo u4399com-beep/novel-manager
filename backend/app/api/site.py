@@ -162,6 +162,9 @@ async def _get_site(request, db) -> Optional[Site]:
 async def _get_categories(db) -> list:
     """Fetch all categories (cached 5min — changes rarely)."""
     cache_key = "all_categories"
+    cached = await _orm_cache.get(cache_key)
+    if cached is not _ORM_MISS:
+        return cached
 
     cats = (await db.execute(
         select(Category).order_by(Category.sort_order)
