@@ -33,17 +33,23 @@ DEFAULT_CONCURRENCY = 5
 
 
 async def fetch_pending_batch(db, limit: int):
-    """Fetch up to *limit* pending tasks."""
+    """Fetch up to *limit* pending tasks (with row-level lock to prevent dupes)."""
     from app.models.crawler_task import CrawlerTask
-    from sqlalchemy import select
+    from sqlalchemy import select, update
 
     result = await db.execute(
         select(CrawlerTask)
         .where(CrawlerTask.status == "pending")
         .order_by(CrawlerTask.created_at)
         .limit(limit)
+        .with_for_update(skip_locked=True)
     )
-    return result.scalars().all()
+    tasks = result.scalars().all()
+    # Atomically mark as running
+    for t in tasks:
+        t.status = "running"
+    await db.flush()
+    return tasks
 
 
 async def count_pending(db_or_factory) -> int:

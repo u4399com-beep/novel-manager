@@ -221,8 +221,7 @@ class AntiDetectClient:
                     )
 
                 client = self._clients[client_key]
-                client.headers = headers
-                resp = await client.get(url)
+                resp = await client.get(url, headers=headers)  # per-request, no shared mutation
                 resp.raise_for_status()
 
                 # Check for common anti-bot responses

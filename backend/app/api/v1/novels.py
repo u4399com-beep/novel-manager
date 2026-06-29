@@ -103,6 +103,12 @@ async def upload_cover(
     if not novel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found")
 
+    # Check size BEFORE reading into memory
+    if file.size and file.size > _MAX_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cover image too large ({file.size} bytes). Max: {_MAX_SIZE} bytes"
+        )
     content = await file.read()
     if len(content) > _MAX_SIZE:
         raise HTTPException(

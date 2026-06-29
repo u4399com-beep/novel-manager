@@ -126,15 +126,12 @@ async def translate_batch(
     target_lang: str,
     source_lang: str = "zh",
 ) -> list[str]:
-    """Translate multiple texts, batching cache lookups."""
+    """Translate multiple texts concurrently."""
     if target_lang == "zh":
         return texts
 
-    results = []
-    for text in texts:
-        translated = await translate_text(db, text, target_lang, source_lang)
-        results.append(translated)
-    return results
+    tasks = [translate_text(db, t, target_lang, source_lang) for t in texts]
+    return await asyncio.gather(*tasks)
 
 
 # ---------------------------------------------------------------------------

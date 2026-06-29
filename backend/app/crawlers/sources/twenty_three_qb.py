@@ -173,8 +173,11 @@ class TwentyThreeQbCrawler(BaseCrawler):
             if len(parts) >= 3:
                 author = parts[2].strip()
 
-            desc_parts = full_text.split(title, 1)
-            description = desc_parts[1].strip() if len(desc_parts) > 1 else ""
+            if title:
+                desc_parts = full_text.split(title, 1)
+                description = desc_parts[1].strip() if len(desc_parts) > 1 else ""
+            else:
+                description = ""
             if author and description.startswith(author):
                 description = description[len(author):].strip(" .")
 

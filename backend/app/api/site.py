@@ -880,7 +880,7 @@ async def site_novels(
         "now": _now(),
         "canonical_url": str(request.url).split("?")[0],
         "link_wheel_links": link_wheel_links,
-        "modules": _build_modules(site, "home",
+        "modules": _build_modules(site, "book_library",
             "hero_carousel", "category_sections", "latest_updates",
             "hot_ranking", "friend_links", "link_wheel"),
     }

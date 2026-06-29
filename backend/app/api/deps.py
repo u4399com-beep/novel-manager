@@ -19,7 +19,13 @@ async def get_current_user(
 ) -> User:
     """Dependency that extracts and validates the JWT token, returns the current user."""
     token = credentials.credentials
-    payload = decode_access_token(token)
+    try:
+        payload = decode_access_token(token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

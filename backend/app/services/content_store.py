@@ -102,9 +102,12 @@ def read_content(novel_id: str, chapter_id: str, file_path: str = "") -> str:
 
 def delete_content(novel_id: str, chapter_id: str, file_path: str = "") -> None:
     """Delete a chapter content file from disk and cache."""
+    global _cache_bytes
     with _lock:
         cache_key = f"{novel_id}:{chapter_id}"
-        _cache.pop(cache_key, None)
+        old = _cache.pop(cache_key, None)
+        if old is not None:
+            _cache_bytes -= len(old.encode("utf-8"))
 
     path = _file_path(novel_id, chapter_id)
     if path.is_file():
@@ -139,7 +142,7 @@ def stats() -> dict:
 
 def _add_to_cache(key: str, text: str):
     global _cache_bytes
-    size = len(text)  # approximate (chars ≈ bytes for Chinese)
+    size = len(text.encode("utf-8"))  # accurate byte count for CJK (3 bytes/char)
     _cache[key] = text
     _cache_bytes += size
     # Evict oldest entries if over limits

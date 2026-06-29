@@ -19,7 +19,7 @@ import os
 import re
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, quote as url_quote
 
 import httpx
 from bs4 import BeautifulSoup, Tag
@@ -410,7 +410,7 @@ async def test_rule(
     if test_url:
         url = test_url
     elif section == "search":
-        kw = keyword or "test"
+        kw = url_quote(keyword or "test")
         url = base_url + section_rule.get("url", "").replace("{keyword}", kw)
     elif section == "novel_info":
         if test_url:
