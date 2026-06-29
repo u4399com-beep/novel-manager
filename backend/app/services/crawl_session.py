@@ -80,6 +80,13 @@ async def _cleanup_stale_sessions():
         _sessions.pop(tid, None)
 
 
+async def _start_session_cleanup(interval: int = 600):
+    """Periodic cleanup of stale crawl sessions (runs every 10 min)."""
+    while True:
+        await asyncio.sleep(interval)
+        await _cleanup_stale_sessions()
+
+
 def create_session(task_id: str, novel_title: str = "") -> CrawlSession:
     session = CrawlSession(task_id, novel_title)
     _sessions[task_id] = session

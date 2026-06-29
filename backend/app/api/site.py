@@ -214,7 +214,7 @@ async def _translate_page_data(db, context: dict, lang: str):
                     n.description = await tr_content(db, n.description[:500], lang)
                 if hasattr(n, "latest_title") and n.latest_title:
                     try: n.latest_title = await tr_content(db, n.latest_title, lang)
-                    except: pass
+                    except Exception: pass
         # Site name — use i18n key, don't translate DB value
         # Categories
         for cat in context.get("categories") or []:

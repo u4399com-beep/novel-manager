@@ -211,7 +211,7 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
                     await db.flush(); await db.commit(); remove_session(task_id); return task
 
                 # --- Phase 2: Concurrent chapter fetch ---
-                CONCURRENCY = 50; sem = asyncio.Semaphore(CONCURRENCY)
+                sem = asyncio.Semaphore(settings.CRAWLER_CONCURRENCY)
                 data = [{} for _ in range(len(new_chapters))]; done = 0; lock = asyncio.Lock()
                 rule = load_rule(source_name); cleaner_cfg = rule.get("cleaner", {}) if rule else {}
                 session.emit(CrawlEvent("progress", phase="fetch", total=len(new_chapters),
