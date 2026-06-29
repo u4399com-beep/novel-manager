@@ -20,7 +20,7 @@
       <p class="meta">{{ novel.author }} ·
         {% if novel.status == 'completed' %}{{ T('completed') }}{% else %}{{ T('ongoing') }}{% endif %} ·
         {{ novel.total_chapters }} {{ T('chapters_count') }}</p>
-      {% if novel.description %}<p style="font-size:.9rem;color:#6c757d;margin-top:4px">{{ novel.description[:200] }}</p>{% endif %}
+      {% if novel.description %}<p style="font-size:.9rem;color:#6c757d;margin-top:4px">{{ (novel.description|nl2br)[:200] }}</p>{% endif %}
     </article>
     {% endfor %}
   </div>

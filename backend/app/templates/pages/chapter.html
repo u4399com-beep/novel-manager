@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ chapter.title }} - {{ novel.title }}{% endblock %}
-{% block description %}{{ chapter.content[:160] if chapter.content else chapter.title }}{% endblock %}
+{% block description %}{{ (chapter.content|striptags)[:160] if chapter.content else chapter.title }}{% endblock %}
 {% block og_type %}article{% endblock %}
 {% block structured_data %}<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"{{ chapter.title }}","author":{"@type":"Person","name":"{{ novel.author }}"},"isPartOf":{"@type":"Book","name":"{{ novel.title }}","url":"{{ request.url_root }}novel/{{ novel.id }}"}}</script>{% endblock %}
 

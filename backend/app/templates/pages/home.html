@@ -29,7 +29,7 @@
         <div class="hero-info">
           <h2><a href="/novel/{{ novel.id }}">{{ novel.title | translate(lang) }}</a></h2>
           <p class="hero-author">{{ novel.author or T('unknown_author') }}</p>
-          <p class="hero-desc">{{ (novel.description or T('no_description'))[:120] }}...</p>
+          <p class="hero-desc">{{ (novel.description|nl2br or T('no_description'))[:120] }}...</p>
           <a href="/novel/{{ novel.id }}/chapters" class="hero-btn">{{ T('start_reading') }}</a>
         </div>
       </div>

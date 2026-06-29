@@ -104,6 +104,35 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
         loader = FileSystemLoader(existing)
         env = Environment(loader=loader, autoescape=True)
 
+        # ── HTML-safe filters for description/content rendering ──
+        import re as _re
+        _BR_RE = _re.compile(r'<br\s*/?>', _re.IGNORECASE)
+        _TAG_RE = _re.compile(r'<[^>]+>')
+
+        def _nl2br(text):
+            """Convert <br> tags to newlines, strip all other HTML."""
+            if not text: return ''
+            text = _BR_RE.sub('\n', str(text))
+            return _TAG_RE.sub('', text)
+
+        def _striptags(text):
+            """Strip ALL HTML tags, return plain text."""
+            if not text: return ''
+            return _TAG_RE.sub('', str(text))
+
+        def _safe_html(text):
+            """Preserve only safe formatting tags: <br>, <p>, <b>, <i>, <em>, <strong>."""
+            if not text: return ''
+            safe_tags = ['br', 'p', 'b', 'i', 'em', 'strong', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+            text = str(text)
+            # Strip unsafe tags
+            text = _re.sub(r'<(?!\/?(?:' + '|'.join(safe_tags) + r')\b)[^>]+>', '', text, flags=_re.IGNORECASE)
+            return text
+
+        env.filters['nl2br'] = _nl2br
+        env.filters['striptags'] = _striptags
+        env.filters['safe_html'] = _safe_html
+
         import hashlib
         _hash_text = lambda t: hashlib.sha256(t.encode()).hexdigest()[:16]
         # Add translation filter (bounded cache, max 1000 entries)
