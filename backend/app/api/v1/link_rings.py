@@ -46,6 +46,8 @@ async def create_link_ring(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if "name" not in data:
+        raise HTTPException(400, "Missing required field: name")
     # Normalize: empty string site_id → None (global ring)
     if data.get("site_id") == "":
         data["site_id"] = None

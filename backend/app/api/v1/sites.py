@@ -16,6 +16,9 @@ async def list_sites(db: AsyncSession = Depends(get_db), current_user: User = De
 
 @router.post("", status_code=201)
 async def create_site(data: dict, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    for required in ("domain", "name"):
+        if required not in data:
+            raise HTTPException(400, f"Missing required field: {required}")
     site = Site(
         domain=data["domain"], name=data["name"],
         template=data.get("template", "default"),

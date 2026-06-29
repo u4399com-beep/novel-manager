@@ -126,24 +126,29 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
 
 # Site context helper
 # ── In-process TTL cache for ORM objects (avoids Redis serialization) ──
+import asyncio as _asyncio
+
 _orm_cache: dict[str, tuple[float, object]] = {}
+_orm_lock = _asyncio.Lock()
 _ORM_MISS = object()  # sentinel to distinguish cached None from cache miss
 
 
-def _cached_orm(key: str, ttl: int, compute):
-    """Simple in-process TTL cache for ORM objects."""
+async def _cached_orm(key: str, ttl: int):
+    """Check in-process TTL cache for ORM objects (async, lock-guarded)."""
     import time
     now = time.monotonic()
-    if key in _orm_cache:
-        expiry, val = _orm_cache[key]
-        if now < expiry:
-            return val if val is not _ORM_MISS else None
+    async with _orm_lock:
+        if key in _orm_cache:
+            expiry, val = _orm_cache[key]
+            if now < expiry:
+                return val if val is not _ORM_MISS else None
     return _ORM_MISS  # signal miss — caller must compute and store
 
 
-def _set_orm_cache(key: str, val: object, ttl: int):
+async def _set_orm_cache(key: str, val: object, ttl: int):
     import time
-    _orm_cache[key] = (time.monotonic() + ttl, val)
+    async with _orm_lock:
+        _orm_cache[key] = (time.monotonic() + ttl, val)
 
 
 async def _get_site(request, db) -> Optional[Site]:
@@ -151,7 +156,7 @@ async def _get_site(request, db) -> Optional[Site]:
     host = request.headers.get("host", "").split(":")[0]
     cache_key = f"site:{host}"
 
-    cached = _cached_orm(cache_key, ttl=3600, compute=None)
+    cached = await _cached_orm(cache_key, ttl=3600)
     if cached is not _ORM_MISS:
         return cached
 
@@ -159,7 +164,7 @@ async def _get_site(request, db) -> Optional[Site]:
         select(Site).where(Site.domain == host, Site.is_active == True)
     )
     site = result.scalars().first()
-    _set_orm_cache(cache_key, site, ttl=3600)
+    await _set_orm_cache(cache_key, site if site is not None else _ORM_MISS, ttl=3600)
     return site
 
 
@@ -167,14 +172,14 @@ async def _get_categories(db) -> list:
     """Fetch all categories (cached 5min — changes rarely)."""
     cache_key = "all_categories"
 
-    cached = _cached_orm(cache_key, ttl=300, compute=None)
+    cached = await _cached_orm(cache_key, ttl=300)
     if cached is not _ORM_MISS:
         return cached
 
     cats = (await db.execute(
         select(Category).order_by(Category.sort_order)
     )).scalars().all()
-    _set_orm_cache(cache_key, cats, ttl=300)
+    await _set_orm_cache(cache_key, cats, ttl=300)
     return cats
 
 
