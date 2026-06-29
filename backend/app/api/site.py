@@ -6,6 +6,7 @@ Features:
     - Link wheel (链轮) rendering
 """
 
+import asyncio
 import math
 import os
 import re
@@ -36,6 +37,33 @@ from app.services.translator import translate_text as tr_content
 
 _tpl_cache: dict[str, Jinja2Templates] = {}
 TEMPLATES_BASE = os.path.join(os.path.dirname(__file__), "..", "templates")
+
+
+async def _check_page_cache(page_type: str, site, path: str, query: str) -> Optional[str]:
+    """Check in-memory LRU cache BEFORE any DB queries. Returns HTML or None."""
+    from app.services.page_cache import page_cache
+    lang = site.language if site else "zh"
+    return await page_cache.get(page_type, path, query, lang)
+
+
+async def _render_page(
+    page_type: str,
+    tpl: Jinja2Templates,
+    template_name: str,
+    context: dict,
+    site,
+    path: str,
+    query: str,
+) -> HTMLResponse:
+    """Render + cache + return HTMLResponse (after DB queries complete)."""
+    from app.services.page_cache import page_cache
+
+    lang = site.language if site else "zh"
+    # Offload Jinja2 render to thread pool (non-blocking)
+    html = await asyncio.to_thread(tpl.env.get_template(template_name).render, context)
+    # Cache for subsequent requests
+    await page_cache.set(page_type, path, query, lang, html)
+    return HTMLResponse(html)
 
 
 def _get_templates(site_template: str = "default") -> Jinja2Templates:
@@ -77,31 +105,56 @@ def _get_templates(site_template: str = "default") -> Jinja2Templates:
 
 
 # Site context helper
+# ── In-process TTL cache for ORM objects (avoids Redis serialization) ──
+_orm_cache: dict[str, tuple[float, object]] = {}
+
+
+def _cached_orm(key: str, ttl: int, compute):
+    """Simple in-process TTL cache for ORM objects."""
+    import time
+    now = time.monotonic()
+    if key in _orm_cache:
+        expiry, val = _orm_cache[key]
+        if now < expiry:
+            return val
+    return None  # miss — caller must compute and store
+
+
+def _set_orm_cache(key: str, val: object, ttl: int):
+    import time
+    _orm_cache[key] = (time.monotonic() + ttl, val)
+
+
 async def _get_site(request, db) -> Optional[Site]:
-    """Resolve the current Site from the request Host header (cached)."""
-    from app.services.redis_cache import get_or_compute
-
+    """Resolve the current Site from the request Host header (cached 1h)."""
     host = request.headers.get("host", "").split(":")[0]
+    cache_key = f"site:{host}"
 
-    async def _fetch():
-        result = await db.execute(
-            select(Site).where(Site.domain == host, Site.is_active == True)
-        )
-        return result.scalars().first()
+    cached = _cached_orm(cache_key, ttl=3600, compute=None)
+    if cached is not None:
+        return cached
 
-    return await get_or_compute("query", "site", host, ttl=3600, compute=_fetch)
+    result = await db.execute(
+        select(Site).where(Site.domain == host, Site.is_active == True)
+    )
+    site = result.scalars().first()
+    _set_orm_cache(cache_key, site, ttl=3600)
+    return site
 
 
 async def _get_categories(db) -> list:
-    """Fetch all categories (cached — changes rarely)."""
-    from app.services.redis_cache import get_or_compute
+    """Fetch all categories (cached 5min — changes rarely)."""
+    cache_key = "all_categories"
 
-    async def _fetch():
-        return (await db.execute(
-            select(Category).order_by(Category.sort_order)
-        )).scalars().all()
+    cached = _cached_orm(cache_key, ttl=300, compute=None)
+    if cached is not None:
+        return cached
 
-    return await get_or_compute("query", "categories", ttl=300, compute=_fetch)
+    cats = (await db.execute(
+        select(Category).order_by(Category.sort_order)
+    )).scalars().all()
+    _set_orm_cache(cache_key, cats, ttl=300)
+    return cats
 
 
 router = APIRouter(tags=["Site"])
@@ -319,6 +372,12 @@ async def site_home(
     size = 24
     site = await _get_site(request, db)
     tpl = _get_templates(site.template if site else "default")
+
+    # Check page cache BEFORE any DB queries
+    cached = await _check_page_cache("home", site, request.url.path, str(request.query_params))
+    if cached:
+        return HTMLResponse(cached)
+
     site_offset = site.offset if site else 0
 
     query = select(Novel).options(selectinload(Novel.categories))
@@ -401,7 +460,7 @@ async def site_home(
     # ---- Link wheel links ----
     link_wheel_links = await _safe_link_wheel(site, db, None, "home")
 
-    return tpl.TemplateResponse("pages/home.html", {
+    context = {
         **_site_context(site),
         "request": request,
         "site": site,
@@ -421,7 +480,11 @@ async def site_home(
         "modules": _build_modules(site, "home",
             "hero_carousel", "category_sections", "latest_updates",
             "hot_ranking", "friend_links", "link_wheel"),
-    })
+    }
+    return await _render_page(
+        "home", tpl, "pages/home.html", context, site,
+        request.url.path, str(request.query_params),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -436,6 +499,10 @@ async def site_novel(
 ):
     site = await _get_site(request, db)
     tpl = _get_templates(site.template if site else "default")
+
+    cached = await _check_page_cache("novel_detail", site, request.url.path, str(request.query_params))
+    if cached:
+        return HTMLResponse(cached)
 
     result = await db.execute(
         select(Novel)
@@ -460,7 +527,7 @@ async def site_novel(
     # ---- Link wheel links ----
     link_wheel_links = await _safe_link_wheel(site, db, novel.id, "novel_detail")
 
-    return tpl.TemplateResponse("pages/novel.html", {
+    context = {
         **_site_context(site),
         "request": request,
         "site": site,
@@ -470,7 +537,11 @@ async def site_novel(
         "now": _now(),
         "link_wheel_links": link_wheel_links,
         "modules": _build_modules(site, "novel_detail", "friend_links", "link_wheel"),
-    })
+    }
+    return await _render_page(
+        "novel_detail", tpl, "pages/novel.html", context, site,
+        request.url.path, str(request.query_params),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -486,6 +557,10 @@ async def site_chapter_list(
 ):
     site = await _get_site(request, db)
     tpl = _get_templates(site.template if site else "default")
+
+    cached = await _check_page_cache("chapter_list", site, request.url.path, str(request.query_params))
+    if cached:
+        return HTMLResponse(cached)
 
     novel = (await db.execute(
         select(Novel).where(Novel.id == novel_id)
@@ -518,7 +593,7 @@ async def site_chapter_list(
     # ---- Link wheel links ----
     link_wheel_links = await _safe_link_wheel(site, db, novel.id, "chapter_list")
 
-    return tpl.TemplateResponse("pages/chapter_list.html", {
+    context = {
         **_site_context(site),
         "request": request,
         "site": site,
@@ -530,7 +605,11 @@ async def site_chapter_list(
         "now": _now(),
         "link_wheel_links": link_wheel_links,
         "modules": _build_modules(site, "chapter_list", "link_wheel"),
-    })
+    }
+    return await _render_page(
+        "chapter_list", tpl, "pages/chapter_list.html", context, site,
+        request.url.path, str(request.query_params),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -545,6 +624,10 @@ async def site_chapter(
 ):
     site = await _get_site(request, db)
     tpl = _get_templates(site.template if site else "default")
+
+    cached = await _check_page_cache("chapter_read", site, request.url.path, str(request.query_params))
+    if cached:
+        return HTMLResponse(cached)
 
     chapter = (await db.execute(
         select(Chapter).where(Chapter.id == chapter_id)
@@ -640,7 +723,7 @@ async def site_chapter(
                 page_urls[p] = f"{base}?{page_param}={p}"
 
     cats = await _get_categories(db)
-    return tpl.TemplateResponse("pages/chapter.html", {
+    context = {
         **_site_context(site),
         "request": request,
         "site": site,
@@ -652,20 +735,20 @@ async def site_chapter(
         "next_id": str(next_ch.id) if next_ch else "",
         "next_title": next_ch.title if next_ch else "",
         "now": _now(),
-        # Pagination
         "total_pages": total_pages,
         "current_page": current_page,
         "page_param": page_param,
         "page_urls": page_urls,
         "has_pagination": total_pages > 1,
-        # Link wheel
         "link_wheel_links": link_wheel_links,
-        # Random recommendations
         "rand_novels": rand_novels,
-        # Module toggles
         "modules": _build_modules(site, "chapter_read",
             "random_recommend", "reader_toolbar", "link_wheel"),
-    })
+    }
+    return await _render_page(
+        "chapter_read", tpl, "pages/chapter.html", context, site,
+        request.url.path, str(request.query_params),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -681,6 +764,11 @@ async def site_search(
 ):
     site = await _get_site(request, db)
     tpl = _get_templates(site.template if site else "default")
+
+    cached = await _check_page_cache("search", site, request.url.path, str(request.query_params))
+    if cached:
+        return HTMLResponse(cached)
+
     results = []
     total = 0
     if q:
@@ -698,7 +786,7 @@ async def site_search(
     # ---- Link wheel links ----
     link_wheel_links = await _safe_link_wheel(site, db, None, "home")
 
-    return tpl.TemplateResponse("pages/search.html", {
+    context = {
         **_site_context(site),
         "request": request,
         "site": site,
@@ -711,7 +799,11 @@ async def site_search(
         "now": _now(),
         "link_wheel_links": link_wheel_links,
         "modules": _build_modules(site, "search", "link_wheel"),
-    })
+    }
+    return await _render_page(
+        "search", tpl, "pages/search.html", context, site,
+        request.url.path, str(request.query_params),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -728,6 +820,11 @@ async def site_novels(
 ):
     site = await _get_site(request, db)
     tpl = _get_templates(site.template if site else "default")
+
+    cached = await _check_page_cache("book_library", site, request.url.path, str(request.query_params))
+    if cached:
+        return HTMLResponse(cached)
+
     size = 30
     query = select(Novel).options(selectinload(Novel.categories))
 
@@ -748,7 +845,7 @@ async def site_novels(
     # ---- Link wheel links ----
     link_wheel_links = await _safe_link_wheel(site, db, None, "home")
 
-    return tpl.TemplateResponse("pages/home.html", {
+    context = {
         **_site_context(site),
         "request": request,
         "site": site,
@@ -768,4 +865,8 @@ async def site_novels(
         "modules": _build_modules(site, "home",
             "hero_carousel", "category_sections", "latest_updates",
             "hot_ranking", "friend_links", "link_wheel"),
-    })
+    }
+    return await _render_page(
+        "book_library", tpl, "pages/home.html", context, site,
+        request.url.path, str(request.query_params),
+    )

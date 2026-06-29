@@ -9,7 +9,7 @@ _is_mysql = "mysql" in settings.DATABASE_URL or "asyncmy" in settings.DATABASE_U
 
 _kwargs: dict = {"echo": False, "future": True}
 if _is_mysql:
-    _kwargs.update(pool_size=15, max_overflow=20, pool_recycle=3600, pool_timeout=15)
+    _kwargs.update(pool_size=30, max_overflow=30, pool_recycle=3600, pool_timeout=15)
 elif _is_sqlite:
     _kwargs["connect_args"] = {"timeout": 20}
 

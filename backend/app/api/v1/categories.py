@@ -11,22 +11,32 @@ from app.schemas.category import CategoryCreate, CategoryRead, CategoryUpdate
 router = APIRouter()
 
 
+# ── In-process TTL cache for ORM objects ──
+_orm_cache: dict[str, tuple[float, object]] = {}
+
+
 @router.get("", response_model=list[CategoryRead])
 async def list_categories(db: AsyncSession = Depends(get_db)):
     """List all categories, ordered by sort_order (cached 5 min)."""
-    from app.services.redis_cache import get_or_compute
+    import time
+    cache_key = "all_categories_api"
+    now = time.monotonic()
+    if cache_key in _orm_cache:
+        expiry, val = _orm_cache[cache_key]
+        if now < expiry:
+            return val
 
-    async def _fetch():
-        result = await db.execute(
-            select(Category).order_by(Category.sort_order.asc())
-        )
-        return result.scalars().all()
-
-    return await get_or_compute("query", "categories_api", ttl=300, compute=_fetch)
+    result = await db.execute(
+        select(Category).order_by(Category.sort_order.asc())
+    )
+    cats = result.scalars().all()
+    _orm_cache[cache_key] = (now + 300, cats)
+    return cats
 
 
 async def _invalidate_category_cache():
     """Invalidate cached category queries after mutation."""
+    _orm_cache.pop("all_categories_api", None)
     from app.services.redis_cache import delete_pattern
     await delete_pattern("query", "*categories*")
 
