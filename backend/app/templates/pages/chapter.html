@@ -4,13 +4,32 @@
 {% block og_type %}article{% endblock %}
 {% block structured_data %}<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"{{ chapter.title }}","author":{"@type":"Person","name":"{{ novel.author }}"},"isPartOf":{"@type":"Book","name":"{{ novel.title }}","url":"{{ request.url_root }}novel/{{ novel.id }}"}}</script>{% endblock %}
 
-{% block breadcrumb %}
-<div class="breadcrumb"><div class="content"><a href="/">{{ T('breadcrumb_home') }}</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; <strong>{{ chapter.title }}</strong></div></div>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
+<!-- Reader Toolbar — sticks to nav bar -->
+<div class="reader-toolbar" id="readerToolbar">
+  <select id="fontFamily" title="{{ T('font_family') }}">
+    <option value="">{{ T('font_default') }}</option>
+    <option value="'PingFang SC', 'Microsoft YaHei', sans-serif">{{ T('font_hei') }}</option>
+    <option value="'Noto Serif SC', 'SimSun', 'STSong', serif">{{ T('font_song') }}</option>
+    <option value="'KaiTi', 'STKaiti', '楷体', serif">{{ T('font_kai') }}</option>
+    <option value="'Georgia', 'Times New Roman', serif">{{ T('font_serif') }}</option>
+  </select>
+  <button id="fontSizeDown" title="{{ T('font_size_down') }}">A-</button>
+  <span id="fontSizeLabel">18px</span>
+  <button id="fontSizeUp" title="{{ T('font_size_up') }}">A+</button>
+  <span class="sep">|</span>
+  <button class="bg-btn active" data-bg="#fff" style="background:#fff" title="{{ T('bg_white') }}">□</button>
+  <button class="bg-btn" data-bg="#f5f0e8" style="background:#f5f0e8" title="{{ T('bg_warm') }}">□</button>
+  <button class="bg-btn" data-bg="#e8f0e8" style="background:#e8f0e8" title="{{ T('bg_green') }}">□</button>
+  <button class="bg-btn" data-bg="#1a1a2e" style="background:#1a1a2e;color:#ccc" title="{{ T('bg_dark') }}">□</button>
+  <span class="sep">|</span>
+  <span class="hint">{{ T('space_hint') }}</span>
+  <button class="fullscreen-btn" onclick="document.documentElement.requestFullscreen()" title="{{ T('fullscreen') }}">⛶</button>
+</div>
+
 <div class="box view-heading">
-  <div class="chepnav">{{ T('current_position') }}：<a href="/">{{ T('breadcrumb_home') }}</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; {{ chapter.title }}</div>
   <h1 class="article-title">{{ chapter.title | translate(lang) }}</h1>
   <div class="article-info">{{ novel.author }} · {{ chapter.word_count }}字 · {{ chapter.updated_at.strftime('%Y-%m-%d') if chapter.updated_at else '' }}</div>
 
@@ -39,28 +58,6 @@
     </div>
   </div>
   {% endif %}
-
-  <!-- Reader Toolbar -->
-  <div class="reader-toolbar" id="readerToolbar" style="top:0">
-    <select id="fontFamily" title="{{ T('font_family') }}">
-      <option value="">{{ T('font_default') }}</option>
-      <option value="'PingFang SC', 'Microsoft YaHei', sans-serif">{{ T('font_hei') }}</option>
-      <option value="'Noto Serif SC', 'SimSun', 'STSong', serif">{{ T('font_song') }}</option>
-      <option value="'KaiTi', 'STKaiti', '楷体', serif">{{ T('font_kai') }}</option>
-      <option value="'Georgia', 'Times New Roman', serif">{{ T('font_serif') }}</option>
-    </select>
-    <button id="fontSizeDown" title="{{ T('font_size_down') }}">A-</button>
-    <span id="fontSizeLabel">18px</span>
-    <button id="fontSizeUp" title="{{ T('font_size_up') }}">A+</button>
-    <span class="sep">|</span>
-    <button class="bg-btn active" data-bg="#fff" style="background:#fff" title="{{ T('bg_white') }}">□</button>
-    <button class="bg-btn" data-bg="#f5f0e8" style="background:#f5f0e8" title="{{ T('bg_warm') }}">□</button>
-    <button class="bg-btn" data-bg="#e8f0e8" style="background:#e8f0e8" title="{{ T('bg_green') }}">□</button>
-    <button class="bg-btn" data-bg="#1a1a2e" style="background:#1a1a2e;color:#ccc" title="{{ T('bg_dark') }}">□</button>
-    <span class="sep">|</span>
-    <span class="hint">{{ T('space_hint') }}</span>
-    <button class="fullscreen-btn" onclick="document.documentElement.requestFullscreen()" title="{{ T('fullscreen') }}">⛶</button>
-  </div>
 
   <div class="article-content" id="articleContent">
     {% if chapter.content %}
@@ -200,9 +197,10 @@
 
 <style>
 .reader-toolbar{
-  display:flex;align-items:center;gap:8px;padding:8px 14px;margin:0 -14px 12px;
-  background:#f8f9f9;border-radius:8px;font-size:13px;position:sticky;top:0;z-index:10;
-  transition:opacity .3s;flex-wrap:wrap;
+  display:flex;align-items:center;gap:8px;padding:6px 16px;
+  background:#f8f9f9;border-bottom:1px solid #e8eaed;font-size:13px;
+  position:sticky;top:0;z-index:100;
+  transition:opacity .3s;flex-wrap:wrap;margin:0;border-radius:0;
 }
 .reader-toolbar select{
   border:1px solid #ddd;border-radius:4px;padding:3px 8px;font-size:13px;background:#fff;
