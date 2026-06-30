@@ -2,10 +2,11 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.api.deps import get_current_user
 from app.api.v1.router import api_router
 from app.api.site import router as site_router
 from app.config import settings
@@ -122,7 +123,7 @@ def create_app() -> FastAPI:
         }
 
     @app.get("/metrics")
-    async def metrics():
+    async def metrics(current_user = Depends(get_current_user)):
         from app.services.page_cache import page_cache
         from app.services.write_behind_cache import get_stats as wb_stats
         from app.services.content_store import stats as cs_stats

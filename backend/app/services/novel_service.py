@@ -42,8 +42,9 @@ async def list_novels(
     if category_id is not None:
         query = query.where(Novel.categories.any(Category.id == category_id))
 
-    # Sort
-    sort_col = getattr(Novel, sort_by, Novel.updated_at)
+    # Sort — whitelist to prevent arbitrary column access
+    _ALLOWED_SORT = frozenset({"title", "author", "updated_at", "created_at", "total_chapters", "status"})
+    sort_col = getattr(Novel, sort_by) if sort_by in _ALLOWED_SORT else Novel.updated_at
     if sort_dir == "asc":
         query = query.order_by(sort_col.asc())
     else:

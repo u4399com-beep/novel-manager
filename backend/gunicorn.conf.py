@@ -32,7 +32,7 @@ max_requests = 5000       # Restart worker after 5k requests (prevent leaks)
 max_requests_jitter = 500  # Randomize restart timing
 
 # ---- Preload ----
-preload_app = False  # Don't preload — avoids DB connections shared across fork
+preload_app = True  # Share module memory across workers (post_fork warms per-worker pools)
 
 
 def post_fork(server, worker):

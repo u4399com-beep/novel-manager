@@ -10,15 +10,16 @@ log = logging.getLogger("config")
 class Settings(BaseSettings):
     """Application settings loaded from environment / .env file."""
 
+    # Environment: "development" | "production"
+    ENVIRONMENT: str = "development"
+
     # Database
-    # MySQL:   mysql+asyncmy://user:password@host:3306/dbname
-    # SQLite:  sqlite+aiosqlite:///./novel_manager.db
     DATABASE_URL: str = "mysql+asyncmy://root:password@localhost:3306/novel_manager"
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
     DB_POOL_RECYCLE: int = 3600
 
-    # Auth — SECRET_KEY auto-generated if not set (override via env for production)
+    # Auth — must be set via env in production
     SECRET_KEY: str = ""
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
@@ -56,24 +57,20 @@ settings = Settings()
 
 _DEFAULT_DB = "mysql+asyncmy://root:password@localhost:3306/novel_manager"
 
+_is_production = settings.ENVIRONMENT == "production"
+
 if not settings.SECRET_KEY:
+    if _is_production:
+        raise RuntimeError("SECRET_KEY must be set in production environment")
     import secrets as _secrets
     settings.SECRET_KEY = _secrets.token_urlsafe(32)
-    log.warning(
-        "SECRET_KEY auto-generated for this session. "
-        "Set SECRET_KEY env var for persistent keys across restarts."
-    )
+    log.warning("SECRET_KEY auto-generated for development session.")
 elif settings.SECRET_KEY == "change-me-in-production-use-a-strong-random-key":
-    log.warning(
-        "SECRET_KEY is still the default placeholder! "
-        "Set SECRET_KEY env var to a strong random value."
-    )
+    if _is_production:
+        raise RuntimeError("SECRET_KEY is still the default placeholder. Set to a strong random value.")
 
-if settings.DATABASE_URL == _DEFAULT_DB:
-    log.warning(
-        "DATABASE_URL is using the default root:password credentials! "
-        "Set DATABASE_URL env var for production."
-    )
+if settings.DATABASE_URL == _DEFAULT_DB and _is_production:
+    raise RuntimeError("DATABASE_URL must not use default root:password in production")
 
 _localhost_origins = [o for o in settings.CORS_ORIGINS if "://localhost" in str(o) or "://127.0.0.1" in str(o)]
 if _localhost_origins:
