@@ -4,7 +4,9 @@
 {% block og_type %}article{% endblock %}
 {% block structured_data %}<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"{{ chapter.title }}","author":{"@type":"Person","name":"{{ novel.author }}"},"isPartOf":{"@type":"Book","name":"{{ novel.title }}","url":"{{ request.url_root }}novel/{{ novel.id }}"}}</script>{% endblock %}
 
-{% block breadcrumb %}{% endblock %}
+{% block breadcrumb %}
+<div class="breadcrumb"><div class="content"><a href="/">{{ T('breadcrumb_home') }}</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; <strong>{{ chapter.title }}</strong></div></div>
+{% endblock %}
 
 {% block content %}
 <!-- Reader Toolbar — sticks to nav bar -->
