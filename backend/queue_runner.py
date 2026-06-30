@@ -159,9 +159,11 @@ async def main():
 
 
 async def _reset_running_tasks():
-    """Reset this process's running tasks back to pending on exit."""
-    import os as _os
-    pid = _os.getpid()
+    """Reset ONLY stale running tasks (started > 5 min ago) back to pending on exit.
+
+    Only resets tasks that have been running too long — leaves recently-started
+    tasks alone in case another runner process picked them up.
+    """
     try:
         from app.database import async_session_factory
         from sqlalchemy import text
@@ -169,11 +171,11 @@ async def _reset_running_tasks():
             result = await db.execute(text(
                 "UPDATE crawler_tasks SET status='pending', "
                 "error_message='队列进程退出，重置为待处理', started_at=NULL "
-                "WHERE status='running'"
+                "WHERE status='running' AND started_at < NOW() - INTERVAL '5 minutes'"
             ))
             await db.commit()
             if result.rowcount > 0:
-                log.info(f"🧹 退出清理: {result.rowcount} 个 running 任务已重置为 pending")
+                log.info(f"🧹 退出清理: {result.rowcount} 个 stale running 任务已重置为 pending")
     except Exception as e:
         log.warning(f"清理 running 任务失败: {e}")
 

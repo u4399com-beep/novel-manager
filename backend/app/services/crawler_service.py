@@ -293,8 +293,8 @@ async def run_crawl(db: AsyncSession, task_id: str, *, mode: str = "direct") -> 
     except Exception as exc:
         task.status = "failed"; task.error_message = type(exc).__name__ + ": " + str(exc)[:480]; task.finished_at = datetime.now(timezone.utc)
         session.emit(CrawlEvent("error", message=type(exc).__name__ + ": " + str(exc)[:280]))
-        await db.flush()   # persist error state BEFORE rollback expunges objects
-        await db.rollback()  # roll back chapter inserts only
+        await db.commit()  # commit error state FIRST, then rollback chapter inserts
+        await db.rollback()
     finally:
         await session.close()
 

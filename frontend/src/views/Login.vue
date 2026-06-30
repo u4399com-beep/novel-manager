@@ -109,7 +109,8 @@ async function handleLogin() {
     await authStore.login(form.username, form.password)
     ElMessage.success('登录成功')
     const redirect = route.query.redirect as string || '/dashboard'
-    router.push(redirect)
+    // Only allow same-origin redirects (prevent open redirect phishing)
+    router.push(redirect.startsWith('/') ? redirect : '/dashboard')
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || '登录失败')
   } finally {

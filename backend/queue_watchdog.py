@@ -67,8 +67,12 @@ def is_runner_alive():
         return False
 
 
+_runner_pid: int = 0
+
+
 def start_runner():
     """Start queue_runner.py as a background process."""
+    global _runner_pid
     log.info("Starting queue_runner...")
     try:
         proc = subprocess.Popen(
@@ -77,7 +81,7 @@ def start_runner():
             stderr=subprocess.STDOUT,
             cwd=os.path.dirname(os.path.abspath(__file__)),
         )
-        # Detach — let it run independently
+        _runner_pid = proc.pid
         return True
     except Exception as e:
         log.error(f"Failed to start queue_runner: {e}")
@@ -233,8 +237,14 @@ async def watchdog_cycle():
         needs_restart = True
 
     if needs_restart:
-        # Kill existing runner first
-        subprocess.run(["pkill", "-9", "-f", "queue_runner.py"], capture_output=True)
+        # Kill only OUR runner process (SIGTERM for graceful shutdown)
+        global _runner_pid
+        if _runner_pid:
+            try:
+                os.kill(_runner_pid, signal.SIGTERM)
+                log.info(f"Sent SIGTERM to runner PID {_runner_pid}")
+            except ProcessLookupError:
+                pass  # already dead
         await asyncio.sleep(1)
         # Release orphaned DB lock (prevents "another processor holds lock")
         await _release_orphaned_lock()

@@ -158,7 +158,7 @@
                   </template>
                 </el-table-column>
                 <el-table-column label="URL" width="60">
-                  <template #default="{row}"><el-link :href="row.url" target="_blank" size="small">打开</el-link></template>
+                  <template #default="{row}"><el-link v-if="row.url && row.url.startsWith('https://')" :href="row.url" target="_blank" size="small">打开</el-link><span v-else style="color:#999;font-size:12px">-</span></template>
                 </el-table-column>
                 <el-table-column label="测试" width="60">
                   <template #default="{row}">

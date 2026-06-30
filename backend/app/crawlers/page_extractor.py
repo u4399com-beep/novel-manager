@@ -97,10 +97,9 @@ def _extract_generic(
         if not book_id or len(book_id) > 10:
             continue
 
-        # Skip category/list pages (they have more path segments)
-        if re.search(r"/book/lastupdate|/tag/|/author/|/login|/search|/catalog$|\.html$", href) and not href.endswith(".html"):
-            # Allow .html chapter URLs
-            pass
+        # Skip category/list/search pages (they are not novel links)
+        if re.search(r"/book/lastupdate|/tag/|/author/|/login|/search|/catalog$", href):
+            continue
 
         # Clean title if it's a chapter link
         is_chapter = bool(re.search(r"/\d+\.html$", full_url))

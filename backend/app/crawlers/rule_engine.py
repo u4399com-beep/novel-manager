@@ -436,9 +436,19 @@ async def test_rule(
     else:
         return {"success": False, "error": f"Unknown section: {section}"}
 
-    # SSRF protection: only allow http/https URLs
+    # SSRF protection: block non-http schemes and internal/private IPs
     if not url.startswith(("http://", "https://")):
         return {"success": False, "error": "Only http/https URLs are allowed", "url": url}
+    # Block internal/private IP ranges
+    import ipaddress, re as _re
+    _host_match = _re.search(r'https?://([^/:]+)', url)
+    if _host_match:
+        try:
+            _ip = ipaddress.ip_address(_host_match.group(1))
+            if _ip.is_private or _ip.is_loopback or _ip.is_link_local:
+                return {"success": False, "error": "Internal IP addresses are not allowed", "url": url}
+        except ValueError:
+            pass  # not an IP address, hostname is fine
     try:
         html = await fetch_url(url)
     except Exception as exc:
