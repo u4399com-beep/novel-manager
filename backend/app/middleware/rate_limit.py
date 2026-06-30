@@ -41,8 +41,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not path.startswith("/api/"):
             return await call_next(request)
 
-        # Use direct client IP only (X-Forwarded-For is trivially spoofable without trusted proxy config)
+        # Trust X-Forwarded-For only when request comes from trusted proxy IP
         client_ip = request.client.host if request.client and request.client.host else "unknown"
+        trusted_proxies = getattr(self, '_trusted_proxies', {'127.0.0.1', '::1', 'localhost'})
+        if client_ip in trusted_proxies:
+            xff = request.headers.get("X-Forwarded-For", "")
+            if xff:
+                client_ip = xff.split(",")[0].strip()
         now = time.monotonic()
 
         async with self._lock:

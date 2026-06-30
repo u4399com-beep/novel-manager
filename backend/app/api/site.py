@@ -39,23 +39,9 @@ TEMPLATES_BASE = os.path.join(os.path.dirname(__file__), "..", "templates")
 
 
 async def _check_page_cache(page_type: str, site, path: str, query: str) -> Optional[str]:
-    """Two-level cache check: Redis (L1, cross-worker) → Memory LRU (L2).
-
-    Returns cached HTML or None.  Must be called BEFORE DB queries.
-    """
-    from app.services.redis_cache import get as redis_get
+    """Check in-memory LRU cache.  Must be called BEFORE DB queries."""
     from app.services.page_cache import page_cache
-
     lang = site.language if site else "zh"
-
-    # L1: Redis (shared across all workers — fixes 0% hit rate under load)
-    cached = await redis_get("page", page_type, path, query, lang)
-    if cached:
-        # Promote to L2 for even faster subsequent hits
-        await page_cache.set(page_type, path, query, lang, cached)
-        return cached
-
-    # L2: In-memory LRU (process-local, microsecond latency)
     return await page_cache.get(page_type, path, query, lang)
 
 
@@ -68,27 +54,11 @@ async def _render_page(
     path: str,
     query: str,
 ) -> HTMLResponse:
-    """Render + cache (L1 Redis + L2 Memory) + return HTMLResponse."""
-    from app.services.redis_cache import set as redis_set
+    """Render + cache (in-memory LRU) + return HTMLResponse."""
     from app.services.page_cache import page_cache
-
     lang = site.language if site else "zh"
-    # Set translate filter enabled state
-    _translate_enabled = context.get("translate_enabled", True)
-    # Find and update the filter
-    for tpl_cache in _tpl_cache.values():
-        for fname, fobj in tpl_cache.env.filters.items():
-            if fname == "translate":
-                fobj.enabled = _translate_enabled
-                break
-
     html = await asyncio.to_thread(tpl.env.get_template(template_name).render, context)
-
-    # L2: In-memory (microsecond)
     await page_cache.set(page_type, path, query, lang, html)
-    # L1: Redis (awaited — must complete before response so other workers see it)
-    await redis_set("page", html, page_type, path, query, lang)
-
     return HTMLResponse(html)
 
 
