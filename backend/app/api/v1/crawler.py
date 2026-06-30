@@ -747,13 +747,19 @@ async def queue_status():
     from sqlalchemy import text as _t
     async with asf() as s:
         pending = int((await s.execute(select(func.count()).where(CrawlerTaskModel.status == "pending"))).scalar() or 0)
-        stuck = int((await s.execute(select(func.count()).where(CrawlerTaskModel.status == "running"))).scalar() or 0)
+        running = int((await s.execute(select(func.count()).where(CrawlerTaskModel.status == "running"))).scalar() or 0)
+        # Only count as "stuck" if running > 5 minutes
+        from sqlalchemy import text as _t2
+        stuck = int((await s.execute(select(func.count()).where(
+            CrawlerTaskModel.status == "running",
+            CrawlerTaskModel.started_at < func.now() - _t2("INTERVAL '5 minutes'")
+        ))).scalar() or 0)
         # Check DB lock: queue is active if 'locked' row exists
         lock = (await s.execute(_t(
             "SELECT value, worker_pid FROM system_state WHERE key='queue_processor' AND value='locked'"
         ))).fetchone()
         active = lock is not None
-    return {"running": active, "pending": pending, "stuck": stuck, "worker_pid": lock[1] if lock else None}
+    return {"running": active, "pending": pending, "active_tasks": running, "stuck": stuck, "worker_pid": lock[1] if lock else None}
 
 
 @router.get("/tasks/{task_id}", response_model=CrawlerTaskRead)
