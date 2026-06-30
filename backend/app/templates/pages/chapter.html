@@ -8,8 +8,7 @@
 <div class="breadcrumb"><div class="content"><a href="/">{{ T('breadcrumb_home') }}</a> &gt; <a href="/novel/{{ novel.id }}">{{ novel.title }}</a> &gt; <strong>{{ chapter.title }}</strong></div></div>
 {% endblock %}
 
-{% block content %}
-<!-- Reader Toolbar — sticks to nav bar -->
+{% block header_extra %}
 <div class="reader-toolbar" id="readerToolbar">
   <select id="fontFamily" title="{{ T('font_family') }}">
     <option value="">{{ T('font_default') }}</option>
@@ -30,7 +29,9 @@
   <span class="hint">{{ T('space_hint') }}</span>
   <button class="fullscreen-btn" onclick="document.documentElement.requestFullscreen()" title="{{ T('fullscreen') }}">⛶</button>
 </div>
+{% endblock %}
 
+{% block content %}
 <div class="box view-heading">
   <h1 class="article-title">{{ chapter.title | translate(lang) }}</h1>
   <div class="article-info">{{ novel.author }} · {{ chapter.word_count }}字 · {{ chapter.updated_at.strftime('%Y-%m-%d') if chapter.updated_at else '' }}</div>
@@ -199,10 +200,9 @@
 
 <style>
 .reader-toolbar{
-  display:flex;align-items:center;gap:8px;padding:6px 16px;
-  background:#f8f9f9;border-bottom:1px solid #e8eaed;font-size:13px;
-  position:sticky;top:104px;z-index:100;
-  transition:opacity .3s;flex-wrap:wrap;margin:0;border-radius:0;
+  display:flex;align-items:center;gap:8px;padding:4px 16px 6px;
+  background:transparent;font-size:13px;
+  transition:opacity .3s;flex-wrap:wrap;margin:0;
 }
 .reader-toolbar select{
   border:1px solid #ddd;border-radius:4px;padding:3px 8px;font-size:13px;background:#fff;
