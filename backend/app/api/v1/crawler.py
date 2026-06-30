@@ -721,10 +721,20 @@ async def system_stats(db: AsyncSession = Depends(get_db), current_user: User = 
         total_n = int((await db.execute(select(func.count()).select_from(NovelModel))).scalar() or 0)
         total_ch = int((await db.execute(sa_text("SELECT COUNT(*) FROM chapters"))).scalar() or 0)
         total_words = int((await db.execute(sa_text("SELECT COALESCE(SUM(word_count),0) FROM chapters"))).scalar() or 0)
+        # Check actual queue runner status via DB lock
+        running_t = int((await db.execute(select(func.count()).where(CrawlerTaskModel.status=="running"))).scalar() or 0)
+        lock_row = (await db.execute(sa_text(
+            "SELECT value FROM system_state WHERE key='queue_processor' AND value='locked'"
+        ))).fetchone()
+        queue_active = lock_row is not None
         gz = glob.glob("data/content/**/*.gz", recursive=True)
-        try: r = subprocess.run(['pgrep','-f','queue_runner'], capture_output=True, text=True); qp = r.stdout.strip() if r.returncode==0 else None
-        except: qp = None
-        return json.dumps({"tasks":{"total":total_t,"pending":pending_t,"completed":completed_t,"failed":failed_t},"novels":total_n,"chapters":total_ch,"words":total_words,"content_files":len(gz),"queue_running":_queue_running,"queue_pid":qp,"progress":round(completed_t/max(total_t,1)*100,1)})
+        return json.dumps({
+            "tasks":{"total":total_t,"pending":pending_t,"completed":completed_t,"failed":failed_t,"running":running_t},
+            "novels":total_n,"chapters":total_ch,"words":total_words,
+            "content_files":len(gz),
+            "queue_running":queue_active,
+            "progress":round(completed_t/max(total_t,1)*100,1),
+        })
 
     result = await get_or_compute("query", "system_stats", ttl=10, compute=_compute)
     return json.loads(result) if isinstance(result, str) else result
@@ -732,12 +742,18 @@ async def system_stats(db: AsyncSession = Depends(get_db), current_user: User = 
 
 @router.get("/tasks/queue-status", status_code=200)
 async def queue_status():
-    """Check if the task queue is currently running."""
-    global _queue_running
+    """Check if the task queue is actually running (DB lock check)."""
     from app.database import async_session_factory as asf
+    from sqlalchemy import text as _t
     async with asf() as s:
         pending = int((await s.execute(select(func.count()).where(CrawlerTaskModel.status == "pending"))).scalar() or 0)
-    return {"running": _queue_running, "pending": pending}
+        stuck = int((await s.execute(select(func.count()).where(CrawlerTaskModel.status == "running"))).scalar() or 0)
+        # Check DB lock: queue is active if 'locked' row exists
+        lock = (await s.execute(_t(
+            "SELECT value, worker_pid FROM system_state WHERE key='queue_processor' AND value='locked'"
+        ))).fetchone()
+        active = lock is not None
+    return {"running": active, "pending": pending, "stuck": stuck, "worker_pid": lock[1] if lock else None}
 
 
 @router.get("/tasks/{task_id}", response_model=CrawlerTaskRead)
